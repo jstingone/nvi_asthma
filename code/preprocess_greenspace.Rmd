@@ -218,7 +218,7 @@ NY_green_space<-NY_green_space%>%
   mutate(WVW_Pop=-WVW_Pop-min(-WVW_Pop, na.rm = TRUE),
          TAFSQM_p=-TAFSQM_p-min(-TAFSQM_p, na.rm = TRUE),
          GAHSQM_p=-GAHSQM_p-min(-GAHSQM_p, na.rm = TRUE))
-#Remove the data after preprocessing
+#Remove the data after preprocess
 NY_green_space<-NY_green_space%>%
   select(-c('population','TTLSQM','LNDSQM',))
 
