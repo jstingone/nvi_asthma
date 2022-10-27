@@ -97,7 +97,7 @@ census_orig <- census_orig %>%
 ```
 
 ```{r}
-#Saving the data
+#Saving the data 2011 - 2015 ACS
 saveRDS(census_orig, file = "data/raw/US Census/us_census_acs_2015.rds")
 
 ```
