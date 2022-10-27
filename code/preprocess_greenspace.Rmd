@@ -1,0 +1,225 @@
+---
+title: "Preprocess_Greenspace"
+author: "Karveandhan"
+date: "8/19/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+require("knitr")
+opts_knit$set(root.dir = "~/Desktop/Columbia University/Research/DASHI Project/nvi_asthma/nvi_asthma")
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+library(tidyverse)
+library(dplyr)
+library(nycgeo)
+library(ggspatial)
+```
+
+## Including Plots
+
+
+```{r}
+NY_Block_Population <- read_csv("data/raw/greenspace/NYNY_BG_Pop.csv")
+NY_Block_Population<-NY_Block_Population%>%
+  dplyr::select(c(bgrp,SUM_POP10))%>%
+  dplyr::rename(population='SUM_POP10')
+```
+
+```{r}
+NY_Block_Population<-NY_Block_Population%>%
+  dplyr::mutate(bgrp_tract=substr(bgrp,1,11))
+NY_tract_population<- NY_Block_Population %>% 
+  group_by(bgrp_tract) %>% 
+  summarise(population = sum(population))%>%
+  rename(Tract_FIPS='bgrp_tract')
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+NY_flood_plain<-read_csv("data/raw/greenspace/NYNY_Floodplain.csv")
+NY_flood_plain<-NY_flood_plain%>%
+  select(c(bgrp,FP1_Land_M))%>%
+  mutate(bgrp_tract=substr(bgrp,1,11))%>%
+  select(-c(bgrp))%>%
+  group_by(bgrp_tract)%>%
+  summarise(total_area_1=sum(FP1_Land_M))%>%
+  rename(Tract_FIPS='bgrp_tract')
+
+```
+
+```{r}
+NY_iTree<-read_csv("data/raw/greenspace/NYNY_iTree.csv")
+NY_iTree<-NY_iTree%>%
+  select(c(bgrp,TAFSQM,GAHSQM,LNDSQM,TTLSQM))%>%
+  mutate(bgrp_tract=substr(bgrp,1,11))%>%
+  select(-c(bgrp))%>%
+  group_by(bgrp_tract)%>%
+  summarise_each(funs(sum))%>%
+  rename(Tract_FIPS='bgrp_tract')
+
+```
+
+```{r}
+NYNY_NrRd_Pop<-read_csv("data/raw/greenspace/NYNY_NrRd_Pop.csv")
+NYNY_NrRd_Pop[NYNY_NrRd_Pop==-99999]=0
+NYNY_NrRd_Pop<-NYNY_NrRd_Pop%>%
+  mutate(bgrp_tract=substr(bgrp,1,11))%>%
+  select(-c(bgrp))%>%
+  select(c(bgrp_tract,IBuff_Pop))%>%
+  group_by(bgrp_tract)%>%
+  summarize_each(funs(sum))%>%
+  rename(Tract_FIPS='bgrp_tract')
+
+```
+
+
+```{r}
+NYNY_Park_Pop<-read_csv("data/raw/greenspace/NYNY_Park_Pop.csv")
+NYNY_Park_Pop<-NYNY_Park_Pop%>%
+  select(c(bgrp,BWDP_Pop))
+NYNY_Park_Pop[NYNY_Park_Pop==-99999]=0
+NYNY_Park_Pop<-NYNY_Park_Pop%>%
+  mutate(bgrp_tract=substr(bgrp,1,11))%>%
+  select(-c(bgrp))%>%
+  group_by(bgrp_tract)%>%
+  summarise_each(funs(sum))%>%
+  rename(Tract_FIPS='bgrp_tract')
+
+```
+
+
+```{r}
+NYNY_WaterWV<-read_csv("data/raw/greenspace/NYNY_WaterWV.csv")
+NYNY_WaterWV[NYNY_WaterWV==-99999]=0
+NYNY_WaterWV<-NYNY_WaterWV%>%
+  mutate(bgrp_tract=substr(bgrp,1,11))%>%
+  select(-c(bgrp,WVW_Pct))%>%
+  group_by(bgrp_tract)%>%
+  summarise_each(funs(sum))%>%
+  rename(Tract_FIPS='bgrp_tract')
+```
+
+```{r}
+previous_nevi<-read_csv("data/processed/nevi_tract_final.csv")
+NY_green_space<-as.data.frame(previous_nevi$Tract_FIPS)
+colnames(NY_green_space)=c("Tract_FIPS")
+NY_green_space<-NY_green_space%>%
+  mutate(Tract_FIPS=as.character(Tract_FIPS))
+#NY_green_space<-as.data.frame(NY_green_space)
+NY_green_space<-NY_green_space%>%
+  left_join(NY_tract_population,by='Tract_FIPS')%>%
+  left_join(NY_flood_plain,by='Tract_FIPS')%>%
+  left_join(NY_iTree,by='Tract_FIPS')%>%
+  left_join(NYNY_NrRd_Pop,by='Tract_FIPS')%>%
+  left_join(NYNY_Park_Pop,by='Tract_FIPS')%>%
+  left_join(NYNY_WaterWV,by='Tract_FIPS')
+```
+
+
+```{r}
+NY_green_space<-NY_green_space%>%
+  mutate(WVW_Pop=WVW_Pop/population)%>%
+  mutate(BWDP_Pop=BWDP_Pop/population)%>%
+  mutate(IBuff_Pop =IBuff_Pop/population)
+
+```
+
+```{r}
+NY_green_space <- NY_green_space %>%
+  mutate(TAFSQM_p=TAFSQM/LNDSQM)%>%
+  mutate(total_area_1_p=total_area_1/TTLSQM)%>%
+  mutate(GAHSQM_p=GAHSQM/LNDSQM)%>%
+   select(-c(total_area_1,GAHSQM,TAFSQM))
+
+```
+
+
+```{r}
+flattenCorrMatrix <- function(cormat, pmat) {
+  ut <- upper.tri(cormat)
+  data.frame(
+    row = rownames(cormat)[row(cormat)[ut]],
+    column = rownames(cormat)[col(cormat)[ut]],
+    cor  =(cormat)[ut],
+    p = pmat[ut]
+    )
+}
+library(Hmisc)
+res2<-rcorr(as.matrix(NY_green_space[,5:10]))
+flattenCorrMatrix(res2$r, res2$P)
+
+
+```
+
+```{r}
+tract_nyc_spa1 <-nycgeo::nyc_boundaries(geography = "tract") %>% 
+  dplyr::transmute(Tract_FIPS = geoid)%>%
+  sf::st_transform(crs=2263)
+borough_nyc_spa1<-nycgeo::nyc_boundaries(geography = "borough")%>%
+  dplyr::arrange(borough_name)%>%
+  sf::st_transform(crs=2263)
+
+tract_gs_final_sp1<-tract_nyc_spa1%>%
+  dplyr::inner_join(NY_green_space %>% mutate(Tract_FIPS=as.character(Tract_FIPS)%>% trimws()),by ='Tract_FIPS')
+tract_gs_exclude_sp1<-tract_nyc_spa1%>%
+  dplyr::anti_join(NY_green_space %>% mutate(Tract_FIPS=as.character(Tract_FIPS)%>% trimws()),by ='Tract_FIPS')
+```
+
+```{r}
+gen_fig_green_space<-function(dfin,dfexcl,dfborough,fill_var,fill_color,fill_label,lab_borough)
+{
+  plot_1<-ggplot()+
+    geom_sf(data=dfin,aes(fill=!!sym(fill_var)),color=NA)+
+    geom_sf(data=dfexcl,color="grey30",fill="grey30")+
+    geom_sf(data=dfborough,color='grey20',fill=NA,size=0.2)+
+    theme_minimal()+
+    ggspatial::annotation_north_arrow(location = 'br', height = unit(1,'cm'), width = unit(1.1, 'cm'), pad_x = unit(1.5, "cm"), pad_y = unit(0.5, "cm"), style = north_arrow_orienteering(fill = c('black','black'), text_size = 11))+
+     ggsn::scalebar(data = dfborough, dist = 10, dist_unit = "mi", height = 0.01, st.size = 5, st.dist = 0.05, transform = FALSE, model = 'WGS84', location = "bottomright")+
+    labs(fill = fill_label)+
+    scale_fill_gradient(low = "whitesmoke", high = fill_color)+
+    theme(legend.title = element_text(face = "bold", size = 15), # plot.title = element_text(hjust = 0.75, face = "bold", size = 15),
+          legend.text = element_text(size = 12),
+          legend.spacing.x = unit(0.5, 'cm'),
+          legend.position = "right",
+          axis.line = element_blank(),
+          axis.text = element_blank(),
+          axis.title = element_blank(),
+          panel.grid = element_blank())
+    
+  return(plot_1)
+    
+}
+
+```
+
+
+```{r}
+fig1_temp<-gen_fig_green_space(dfin = tract_gs_final_sp1,dfexcl = tract_gs_exclude_sp1,dfborough = borough_nyc_spa1,fill_var ='BWDP_Pop',fill_label ="Estimated residential population\n not within 500m \nof a park entrance ",lab_borough = 'borough_name', fill_color = '#6b3c03')
+fig2_temp<-gen_fig_green_space(dfin = tract_gs_final_sp1,dfexcl = tract_gs_exclude_sp1,dfborough = borough_nyc_spa1,fill_var ='population',fill_label = "Population",lab_borough = 'borough_name', fill_color = '#950f00')
+fig3_temp<-gen_fig_green_space(dfin = tract_gs_final_sp1,dfexcl = tract_gs_exclude_sp1,dfborough = borough_nyc_spa1,fill_var ='WVW_Pop',fill_label = "View\n of Water",lab_borough = 'borough_name', fill_color = '#006195')
+fig1_temp
+fig2_temp
+fig3_temp
+
+```
+
+
+```{r}
+NY_green_space<-NY_green_space%>%
+  mutate(WVW_Pop=-WVW_Pop-min(-WVW_Pop, na.rm = TRUE),
+         TAFSQM_p=-TAFSQM_p-min(-TAFSQM_p, na.rm = TRUE),
+         GAHSQM_p=-GAHSQM_p-min(-GAHSQM_p, na.rm = TRUE))
+NY_green_space<-NY_green_space%>%
+  select(-c('population','TTLSQM','LNDSQM',))
+
+
+```
