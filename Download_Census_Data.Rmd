@@ -83,6 +83,7 @@ census_orig <- get_acs(geography = "tract", state = "NY", county = county_names,
 ```
 
 ```{r}
+
   # Download data from the Census subject tables 
 census_orig_subject_table <- get_acs(geography = "tract", state = "NY", county = county_names, variables = vars_subject, year = 2015, survey = "acs5", output = "wide") %>% 
   dplyr::select(-NAME)
@@ -96,6 +97,7 @@ census_orig <- census_orig %>%
 ```
 
 ```{r}
+#Saving the data
 saveRDS(census_orig, file = "data/raw/US Census/us_census_acs_2015.rds")
 
 ```
