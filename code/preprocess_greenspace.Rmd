@@ -5,16 +5,15 @@ date: "8/19/2022"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+Set the working directory to one folder up from the RMarkdown file for later data export.
+
+```{r setup, warning=FALSE}
 require("knitr")
-opts_knit$set(root.dir = "~/Desktop/Columbia University/Research/DASHI Project/nvi_asthma/nvi_asthma")
+opts_knit$set(warning = FALSE,root.dir = "~/Desktop/Columbia University/Research/DASHI Project/nvi_asthma/nvi_asthma")
 ```
 
-## R Markdown
+### Import the required libraries to begin the preprocessing
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r cars}
 library(tidyverse)
@@ -23,8 +22,14 @@ library(nycgeo)
 library(ggspatial)
 ```
 
-## Including Plots
+### Import the Data
 
+Import the following Census Block-level data files:
+
+-   [U.S. Environmental Protection Agency](https://www.epa.gov/enviroatlas/data-download-step-2?token=_lGxnhvc42X3GApGs3hun8TMSBVBePPfIVFukbIyXZE)
+-   Extracting the census block level population from the NYNY_BG_Pop.csv file
+
+Since, we are working on census tract data, we get the population of each census tract so that proportion of all features can be scaled from 0 to 1
 
 ```{r}
 NY_Block_Population <- read_csv("data/raw/greenspace/NYNY_BG_Pop.csv")
@@ -43,7 +48,8 @@ NY_tract_population<- NY_Block_Population %>%
 
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
 ```{r}
 NY_flood_plain<-read_csv("data/raw/greenspace/NYNY_Floodplain.csv")
 NY_flood_plain<-NY_flood_plain%>%
@@ -51,7 +57,7 @@ NY_flood_plain<-NY_flood_plain%>%
   mutate(bgrp_tract=substr(bgrp,1,11))%>%
   select(-c(bgrp))%>%
   group_by(bgrp_tract)%>%
-  summarise(total_area_1=sum(FP1_Land_M))%>%
+  summarise(total_area_flood_1=sum(FP1_Land_M))%>%
   rename(Tract_FIPS='bgrp_tract')
 
 ```
@@ -135,10 +141,9 @@ NY_green_space<-NY_green_space%>%
 
 ```{r}
 NY_green_space <- NY_green_space %>%
-  mutate(TAFSQM_p=TAFSQM/LNDSQM)%>%
-  mutate(total_area_1_p=total_area_1/TTLSQM)%>%
-  mutate(GAHSQM_p=GAHSQM/LNDSQM)%>%
-   select(-c(total_area_1,GAHSQM,TAFSQM))
+  mutate(TAFSQM=TAFSQM/LNDSQM)%>%
+  mutate(total_area_flood_1=total_area_flood_1/TTLSQM)%>%
+  mutate(GAHSQM=GAHSQM/LNDSQM)
 
 ```
 
@@ -216,8 +221,8 @@ fig3_temp
 ```{r}
 NY_green_space<-NY_green_space%>%
   mutate(WVW_Pop=-WVW_Pop-min(-WVW_Pop, na.rm = TRUE),
-         TAFSQM_p=-TAFSQM_p-min(-TAFSQM_p, na.rm = TRUE),
-         GAHSQM_p=-GAHSQM_p-min(-GAHSQM_p, na.rm = TRUE))
+         TAFSQM=-TAFSQM-min(-TAFSQM, na.rm = TRUE),
+         GAHSQM=-GAHSQM-min(-GAHSQM, na.rm = TRUE))
 #Remove the data after preprocess
 NY_green_space<-NY_green_space%>%
   select(-c('population','TTLSQM','LNDSQM',))
