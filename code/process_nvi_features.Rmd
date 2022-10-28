@@ -5,7 +5,7 @@ output: html_notebook
 
 
 
-```{r}
+```{r,setup}
 #setwd("~/Desktop/Columbia University/DASHI Project/nvi_asthma")
 knitr::opts_knit$set(warning = FALSE,root.dir = "~/Desktop/Columbia University/Research/DASHI Project/nvi_asthma/")
 library(tidyverse)
@@ -14,9 +14,9 @@ library(rio)
 
 ```{r}
 # US CDC PLACES data, 2016 release
-PLACES_orig <- read_csv("data/raw/US CDC PLACES/PLACES_2015_release.csv")
+PLACES_orig <- read_csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/US CDC PLACES/PLACES_2015_release.csv")
 # US Census, American Community Survey data 2015 5-Year Estimates
-census_orig <- readRDS( file = "data/raw/US Census/us_census_acs_2015.rds")
+census_orig <- readRDS( file = "/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/US Census/us_census_acs_2015.rds")
 
 ```
 
@@ -41,3 +41,119 @@ PLACES_clean <- PLACES_orig %>%
 
 ```
 
+```{r}
+census_features <- census_orig %>% 
+  dplyr::as_tibble() %>% 
+  dplyr::transmute(
+    GEOID = as.character(GEOID),
+    ### Demographics
+    # Age
+    prop_age_under18 = S0101_C02_022E/100,
+    prop_age_65plus = S0101_C02_030E/100, 
+    # Female-led households with children
+    female_led_hh_prop = (B11005_007E + B11005_010E)/B11005_001E,
+    # race/ethnicity
+    white_prop = B02001_002E/B02001_001E,
+    black_prop = B02001_003E/B02001_001E,
+    asian_prop = B02001_005E/B02001_001E,
+    aian_prop = B02001_004E/B02001_001E,
+    nhpi_prop = B02001_006E/B02001_001E, 
+    race_other_prop = B02001_007E/B02001_001E,
+    race_mult_prop = B02001_008E/B02001_001E,
+    aian_nhpi_mult_other_prop = aian_prop + nhpi_prop + race_other_prop + race_mult_prop,
+    hisp_prop = B03003_003E/B03003_001E,
+       # race/ethnicity, not hispanic
+    white_nonhisp_prop = B03002_003E/B03002_001E, 
+    black_nonhisp_prop = B03002_004E/B03002_001E,
+    asian_nonhisp_prop = B03002_006E/B03002_001E,
+    aian_nonhisp_prop = B03002_005E/B03002_001E,
+    nhpi_nonhisp_prop = B03002_007E/B03002_001E, 
+    race_other_nonhisp_prop = B03002_008E/B03002_001E,
+    race_mult_nonhisp_prop = B03002_009E/B03002_001E,
+    aian_nhpi_mult_other_nonhisp_prop = aian_nonhisp_prop + nhpi_nonhisp_prop + race_other_nonhisp_prop + race_mult_nonhisp_prop,
+    # language
+    eng_lim_prop = (B16005_007E+B16005_008E+B16005_012E+B16005_013E+B16005_017E+B16005_018E+
+                      B16005_022E+B16005_023E+B16005_029E+B16005_030E+B16005_034E+B16005_035E+
+                      B16005_039E+B16005_040E+B16005_044E+B16005_045E)/B16005_001E,
+    # US entry period
+    usentry_2010_prop = B05005_002E/B05005_001E,
+    # Nativity
+    forborn_prop = B05002_013E/B05002_001E,
+    # US Citizenship
+    uscitizen_no_prop = B05001_006E/B05001_001E,
+    # Disability status
+    disability_prop = S1810_C03_001E/100,
+    # Single Parent
+    single_parent_prop = (B23008_008E+B23008_021E)/B23008_001E,
+    # Means of transportation to work
+    publictrans_taxi_mcycle_bike_walk_prop = (B08101_025E+B08101_041E+B08101_033E)/B08101_001E,
+    # Travel time
+    travel_time_work_minute = B08013_001E,
+    # living alone
+    prop_living_alone = B11001_008E/B11001_001E,
+    ### Economic Indicators
+    # Income
+    income1yr_neg_median = -B19013_001E - min(-B19013_001E, na.rm = TRUE), # MADE NEGATIVE B/C REVERSE DIRECTION
+    # Poverty
+    poverty1yr_prop = B17001_002E/B17001_001E,
+    # Occupation
+    service_manual_prop = (C24010_019E+C24010_030E+C24010_034E+C24010_055E+C24010_066E+C24010_070E)/C24010_001E,
+    # Gini index
+    gini_index = B19083_001E,
+    # Unemployment
+    unemployment_prop = (B23001_015E+B23001_022E+B23001_029E+B23001_036E+B23001_043E+B23001_050E+B23001_057E+B23001_064E+B23001_071E+B23001_101E+B23001_108E+B23001_115E+B23001_122E+B23001_129E+B23001_136E+B23001_143E+B23001_150E+B23001_157E)/(B23001_013E+B23001_020E+B23001_027E+B23001_034E+B23001_041E+B23001_048E+B23001_055E+B23001_062E+B23001_069E+B23001_099E+B23001_106E+B23001_113E+B23001_120E+B23001_127E+B23001_134E+B23001_141E+B23001_148E+B23001_155E), # among those in labor force
+    # Education
+    education_less_hs_prop = (B15003_002E+B15003_003E+B15003_004E+B15003_005E+B15003_006E+B15003_007E+B15003_008E+B15003_009E+
+                              B15003_010E+B15003_011E+B15003_012E+B15003_013E+B15003_014E+B15003_015E+B15003_016E)/B15003_001E,
+    # Vehicle
+    vehicle_avail_no_prop = B08014_002E/B08014_001E,
+    ### Residential density
+    # Population density
+    pop_density = B01003_001E/(ALAND/2589988.1103), # denom: convert square meters to square miles
+    # Group quarters
+    group_quarters_prop = B26001_001E/B01003_001E,
+    # Occupants per room
+    occ_room_1_01plus_prop = (B25014_005E+B25014_006E+B25014_007E+B25014_011E+B25014_012E+B25014_013E)/B25014_001E,
+    # Year structure built
+    B25035_001E_update = ifelse(B25035_001E == 0, 1939, B25035_001E), # Plug in 1939 for values 1939 or earlier
+    B25035_001E_update = ifelse(B25035_001E_update == 18, NA, B25035_001E_update), # Plug in missing for weird values of 18 for year for now
+    age_structure_2019 = 2019 - B25035_001E_update,
+    # Type of housing
+    str_units_1att_2plus_mobile_boat_rv_van_prop = (B25024_003E+B25024_004E+B25024_005E+B25024_006E+B25024_007E+B25024_008E+B25024_009E+B25024_010E+B25024_011E)/B25024_001E,
+    str_units_20plus = (B25024_008E+B25024_009E)/B25024_001E,
+    # Geographic mobility
+    move1yr_prop = (B07013_007E+B07013_010E+B07013_013E+B07013_016E)/B07013_001E,
+    # Housing vacancy
+    str_vacancy_prop = B25002_003E/B25002_001E,
+    ##### MISC ##### 
+    misc_pop = B01003_001E)
+census_clean <- census_orig %>% 
+  dplyr::transmute(row = row_number(),
+                   tract = as.character(GEOID),
+                   CASRN = '',
+                   Name = '') %>% 
+  dplyr::inner_join(census_features %>% dplyr::rename(tract = GEOID), by = "tract") %>%
+  dplyr::select(-B25035_001E_update) 
+
+```
+
+```{r}
+# Features not included in the NEVI
+vars_raceeth <- c('white_prop', 'aian_prop', 'nhpi_prop', 'race_other_prop', 'race_mult_prop', 'black_prop', 'asian_prop', 'aian_nhpi_mult_other_prop',
+                 'black_nonhisp_prop','asian_nonhisp_prop','aian_nhpi_mult_other_nonhisp_prop','hisp_prop', 'white_nonhisp_prop','aian_nonhisp_prop', 'nhpi_nonhisp_prop', 'race_other_nonhisp_prop', 'race_mult_nonhisp_prop')
+
+## Example code to obtain exclution list
+# tract_exclusions_list_id <- census_clean %>%  
+#  dplyr::select(.dots = -c(vars_raceeth, CASRN, Name)) %>% 
+#  dplyr::mutate(missing_n = rowSums(is.na(.))) %>%
+#  dplyr::filter(misc_pop <= 20 | missing_n > 0) %>%
+#  dplyr::transmute(SID = tract)
+
+## Clean exclusions list
+tract_exclusions_list <- import("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/preprocessing/list_tract_exclusion_20210628.csv")
+tract_exclusions_list_id <- tract_exclusions_list %>% 
+  dplyr::filter(flag_exclude_FINAL == 1) %>% 
+  dplyr::transmute(SID = as.character(GEOID))
+
+
+```
