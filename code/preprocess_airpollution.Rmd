@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 require("knitr")
-opts_knit$set(root.dir = "~/Desktop/Columbia University/Research/DASHI Project/nvi_asthma/nvi_asthma")
+opts_knit$set(root.dir = "~/Desktop/Columbia University/Research/DASHI Project/nvi_asthma/")
 ```
 
 ## R Markdown
@@ -200,6 +200,7 @@ fig4
 fig5
 
 ```
+
 ```{r}
 air_poll_inclu<-air_poll_inclu%>%
   select(-c(code))

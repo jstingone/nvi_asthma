@@ -1,0 +1,43 @@
+---
+title: "Preprocess Features"
+output: html_notebook
+---
+
+
+
+```{r}
+#setwd("~/Desktop/Columbia University/DASHI Project/nvi_asthma")
+knitr::opts_knit$set(warning = FALSE,root.dir = "~/Desktop/Columbia University/Research/DASHI Project/nvi_asthma/")
+library(tidyverse)
+library(rio)
+```
+
+```{r}
+# US CDC PLACES data, 2016 release
+PLACES_orig <- read_csv("data/raw/US CDC PLACES/PLACES_2015_release.csv")
+# US Census, American Community Survey data 2015 5-Year Estimates
+census_orig <- readRDS( file = "data/raw/US Census/us_census_acs_2015.rds")
+
+```
+
+```{r}
+PLACES_clean <- PLACES_orig %>% 
+  dplyr::mutate(tract = as.character(TractFIPS),
+                CHECKUP_CrudePrev = -CHECKUP_CrudePrev - min(-CHECKUP_CrudePrev, na.rm = TRUE),
+                COREM_CrudePrev = -COREM_CrudePrev - min(-COREM_CrudePrev, na.rm = TRUE),
+                COREW_CrudePrev = -COREW_CrudePrev - min(-COREW_CrudePrev, na.rm = TRUE),
+                DENTAL_CrudePrev = -DENTAL_CrudePrev - min(-DENTAL_CrudePrev, na.rm = TRUE),
+                #CERVICAL_CrudePrev = -CERVICAL_CrudePrev - min(-CERVICAL_CrudePrev, na.rm = TRUE),
+                CHOLSCREEN_CrudePrev = -CHOLSCREEN_CrudePrev - min(-CHOLSCREEN_CrudePrev, na.rm = TRUE),
+                COLON_SCREEN_CrudePrev = -COLON_SCREEN_CrudePrev - min(-COLON_SCREEN_CrudePrev, na.rm = TRUE),
+                MAMMOUSE_CrudePrev = -MAMMOUSE_CrudePrev - min(-MAMMOUSE_CrudePrev, na.rm = TRUE)) %>% 
+  dplyr::select(tract,
+    'CSMOKING_CrudePrev',  'BINGE_CrudePrev',  'LPA_CrudePrev',  'OBESITY_CrudePrev',  'SLEEP_CrudePrev',  
+    'BPHIGH_CrudePrev',  'BPMED_CrudePrev',  'CANCER_CrudePrev',  'CASTHMA_CrudePrev',  'CHD_CrudePrev',  
+    'STROKE_CrudePrev',  'COPD_CrudePrev',  'DIABETES_CrudePrev',  'HIGHCHOL_CrudePrev',  'KIDNEY_CrudePrev',  
+    'MHLTH_CrudePrev',  'PHLTH_CrudePrev',  'TEETHLOST_CrudePrev',  'CHECKUP_CrudePrev',  'COREM_CrudePrev',  
+    'COREW_CrudePrev',  'DENTAL_CrudePrev',  'CHOLSCREEN_CrudePrev',  
+    'COLON_SCREEN_CrudePrev',  'MAMMOUSE_CrudePrev',  'ACCESS2_CrudePrev') 
+
+```
+

@@ -9,7 +9,7 @@ Set the working directory to one folder up from the RMarkdown file for later dat
 
 ```{r setup, warning=FALSE}
 require("knitr")
-opts_knit$set(warning = FALSE,root.dir = "~/Desktop/Columbia University/Research/DASHI Project/nvi_asthma/nvi_asthma")
+opts_knit$set(warning = FALSE,root.dir = "~/Desktop/Columbia University/Research/DASHI Project/nvi_asthma/")
 ```
 
 ### Import the required libraries to begin the preprocessing

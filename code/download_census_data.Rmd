@@ -5,8 +5,9 @@ output: html_notebook
 
 
 
-```{r}
-knitr::opts_knit$set(warning = FALSE,root.dir = "~/Desktop/Columbia University/Research/DASHI Project/nvi_asthma/")
+```{r, setup}
+knitr::opts_knit$set(root.dir = "~/Desktop/Columbia University/DASHI Project/nvi_asthma") 
+#setwd("~/Desktop/Columbia University/DASHI Project/nvi_asthma")
 ```
 
 ```{r}
@@ -98,6 +99,6 @@ census_orig <- census_orig %>%
 
 ```{r}
 #Saving the data 2011 - 2015 ACS
-saveRDS(census_orig, file = "us_census_acs_2015.rds")
+saveRDS(census_orig, file = "data/raw/US Census/us_census_acs_2015.rds")
 
 ```
