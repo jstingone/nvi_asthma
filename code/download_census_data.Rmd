@@ -5,8 +5,9 @@ output: html_notebook
 
 
 
-```{r}
-knitr::opts_knit$set(warning = FALSE,root.dir = "~/Desktop/Columbia University/Research/DASHI Project/nvi_asthma/nvi_asthma")
+```{r, setup}
+knitr::opts_knit$set(root.dir = "~/Desktop/Columbia University/DASHI Project/nvi_asthma") 
+#setwd("~/Desktop/Columbia University/DASHI Project/nvi_asthma")
 ```
 
 ```{r}
