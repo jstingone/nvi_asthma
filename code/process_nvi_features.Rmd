@@ -10,6 +10,7 @@ output: html_notebook
 knitr::opts_knit$set(warning = FALSE,root.dir = "~/Desktop/Columbia University/Research/DASHI Project/nvi_asthma/")
 library(tidyverse)
 library(rio)
+library(stringi)
 ```
 
 ```{r}
@@ -134,6 +135,8 @@ census_clean <- census_orig %>%
                    Name = '') %>% 
   dplyr::inner_join(census_features %>% dplyr::rename(tract = GEOID), by = "tract") %>%
   dplyr::select(-B25035_001E_update) 
+census_features<-census_features%>%
+  rename(tract=GEOID)
 
 ```
 
@@ -154,6 +157,221 @@ tract_exclusions_list <- import("/Users/karveandhan/Desktop/Columbia University/
 tract_exclusions_list_id <- tract_exclusions_list %>% 
   dplyr::filter(flag_exclude_FINAL == 1) %>% 
   dplyr::transmute(SID = as.character(GEOID))
+
+
+```
+
+```{r}
+NY_Block_Population <- read_csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/greenspace/NYNY_BG_Pop.csv")
+NY_Block_Population<-NY_Block_Population%>%
+  dplyr::select(c(bgrp,SUM_POP10))%>%
+  dplyr::rename(population='SUM_POP10')
+
+
+```
+
+```{r}
+NY_Block_Population<-NY_Block_Population%>%
+  dplyr::mutate(bgrp_tract=substr(bgrp,1,11))
+NY_tract_population<- NY_Block_Population %>% 
+  group_by(bgrp_tract) %>% 
+  summarise(population = sum(population))%>%
+  rename(tract='bgrp_tract')
+
+
+```
+
+```{r}
+NY_flood_plain<-read_csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/greenspace/NYNY_Floodplain.csv")
+NY_flood_plain<-NY_flood_plain%>%
+  select(c(bgrp,FP1_Land_M))%>%
+  mutate(bgrp_tract=substr(bgrp,1,11))%>%
+  select(-c(bgrp))%>%
+  group_by(bgrp_tract)%>%
+  summarise(total_area_flood_1=sum(FP1_Land_M))%>%
+  rename(tract='bgrp_tract')
+
+```
+
+```{r}
+NY_iTree<-read_csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/greenspace/NYNY_iTree.csv")
+NY_iTree<-NY_iTree%>%
+  select(c(bgrp,TAFSQM,GAHSQM,LNDSQM,TTLSQM))%>%
+  mutate(bgrp_tract=substr(bgrp,1,11))%>%
+  select(-c(bgrp))%>%
+  group_by(bgrp_tract)%>%
+  summarise_each(funs(sum))%>%
+  rename(tract='bgrp_tract')
+
+
+```
+
+
+```{r}
+NYNY_NrRd_Pop<-read_csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/greenspace/NYNY_NrRd_Pop.csv")
+NYNY_NrRd_Pop[NYNY_NrRd_Pop==-99999]=0
+NYNY_NrRd_Pop<-NYNY_NrRd_Pop%>%
+  mutate(bgrp_tract=substr(bgrp,1,11))%>%
+  select(-c(bgrp))%>%
+  select(c(bgrp_tract,IBuff_Pop))%>%
+  group_by(bgrp_tract)%>%
+  summarize_each(funs(sum))%>%
+  rename(tract='bgrp_tract')
+
+
+```
+
+```{r}
+NYNY_Park_Pop<-read_csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/greenspace/NYNY_Park_Pop.csv")
+NYNY_Park_Pop<-NYNY_Park_Pop%>%
+  select(c(bgrp,BWDP_Pop))
+NYNY_Park_Pop[NYNY_Park_Pop==-99999]=0
+NYNY_Park_Pop<-NYNY_Park_Pop%>%
+  mutate(bgrp_tract=substr(bgrp,1,11))%>%
+  select(-c(bgrp))%>%
+  group_by(bgrp_tract)%>%
+  summarise_each(funs(sum))%>%
+  rename(tract='bgrp_tract')
+
+```
+
+```{r}
+NYNY_WaterWV<-read_csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/greenspace/NYNY_WaterWV.csv")
+NYNY_WaterWV[NYNY_WaterWV==-99999]=0
+NYNY_WaterWV<-NYNY_WaterWV%>%
+  mutate(bgrp_tract=substr(bgrp,1,11))%>%
+  select(-c(bgrp,WVW_Pct))%>%
+  group_by(bgrp_tract)%>%
+  summarise_each(funs(sum))%>%
+  rename(tract='bgrp_tract')
+
+
+```
+
+
+```{r}
+#temp1<-read_csv("data/processed/nevi_tract_final.csv")
+nevi_preprocessed<-as.data.frame(census_features$tract)
+colnames(nevi_preprocessed)<-c("tract")
+nevi_preprocessed<-nevi_preprocessed%>%
+  left_join(census_features,by='tract')%>%
+  left_join(PLACES_clean,by='tract')
+  # left_join(NY_tract_population,by='tract')%>%
+  # left_join(NY_flood_plain,by='tract')%>%
+  # left_join(NY_iTree,by='tract')%>%
+  # left_join(NYNY_NrRd_Pop,by='tract')%>%
+  # left_join(NYNY_Park_Pop,by='tract')%>%
+  # left_join(NYNY_WaterWV,by='tract')
+#NY_green_space<-as.data.frame(temp1$Tract_FIPS)
+#colnames(NY_green_space)=c("tract")
+#NY_green_space<-NY_green_space%>%
+#  mutate(tract=as.character(tract))
+#NY_green_space<-as.data.frame(NY_green_space)
+#NY_green_space<-NY_green_space%>%
+#  left_join(NY_tract_population,by='tract')%>%
+#  left_join(NY_school_green,by='tract')%>%
+#  left_join(NY_flood_plain,by='tract')%>%
+#  left_join(NY_iTree,by='tract')%>%
+#  left_join(NY_LCSum,by='tract')%>%
+#  left_join(NYNY_NrRd_Pop,by='tract')%>%
+#  left_join(NYNY_Park_Pop,by='tract')%>%
+#  left_join(NYNY_WaterWV,by='tract')
+
+```
+
+```{r}
+NY_green_space<-as.data.frame(nevi_preprocessed$tract)
+colnames(NY_green_space)<-c('tract')
+NY_green_space<-NY_green_space%>%
+ left_join(NY_tract_population,by='tract')%>%
+ left_join(NY_flood_plain,by='tract')%>%
+ left_join(NY_iTree,by='tract')%>%
+ left_join(NYNY_NrRd_Pop,by='tract')%>%
+ left_join(NYNY_Park_Pop,by='tract')%>%
+ left_join(NYNY_WaterWV,by='tract')
+
+
+```
+
+```{r}
+NY_green_space<-NY_green_space%>%
+  mutate(WVW_Pop=WVW_Pop/population)%>%
+  mutate(BWDP_Pop=BWDP_Pop/population)%>%
+  mutate(IBuff_Pop =IBuff_Pop/population)%>%
+  mutate(TAFSQM=TAFSQM/LNDSQM)%>%
+  mutate(total_area_flood_1=total_area_flood_1/TTLSQM)%>%
+  mutate(GAHSQM=GAHSQM/LNDSQM)
+
+NY_green_space<-NY_green_space%>%
+  mutate(WVW_Pop=-WVW_Pop-min(-WVW_Pop, na.rm = TRUE),
+         TAFSQM=-TAFSQM-min(-TAFSQM, na.rm = TRUE),
+         #total_area_1_p=-total_area_1_p-min(-total_area_1_p, na.rm = TRUE),
+         GAHSQM=-GAHSQM-min(-GAHSQM, na.rm = TRUE))
+NY_green_space<-NY_green_space%>%
+  select(-c('population','TTLSQM','LNDSQM'))
+
+```
+
+
+```{r}
+toxic_material_data<-read.csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/toxic.csv")
+toxic_material_data<-toxic_material_data%>%
+  select('geoid','year','HE_RSEI')
+toxic_material_data<-toxic_material_data%>%
+  filter(geoid %in% (NY_green_space$tract))
+toxic_material_data<-toxic_material_data%>%
+  filter(year==2015)
+```
+
+```{r}
+toxic_material_data<-toxic_material_data%>%
+  rename(tract='geoid')
+toxic_material_data$tract<-as.character(toxic_material_data$tract)
+NY_green_space<-NY_green_space%>%
+  left_join(toxic_material_data%>%
+              select('tract','HE_RSEI'),by='tract')
+
+
+```
+
+
+```{r}
+air_poll<-read_csv('/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/AirPoll_ct2010.csv')
+air_poll$ct2010<-as.character(air_poll$ct2010)
+air_poll$code<-stri_sub(air_poll$ct2010, 1, 1)
+ 
+air_poll$ct2010<-ifelse(air_poll$code=="1", sub('.', '36061', air_poll$ct2010), ifelse(air_poll$code=="2", sub('.', '36005', air_poll$ct2010), ifelse(air_poll$code=="3", sub('.', '36047', air_poll$ct2010), ifelse(air_poll$code=="4", sub('.', '36081', air_poll$ct2010), sub('.', '36085', air_poll$ct2010)))))
+air_poll<-air_poll%>%
+  rename(tract='ct2010')
+
+air_poll<-air_poll%>%
+  filter(tract %in% (NY_green_space$tract))
+
+
+air_poll<-air_poll%>%
+  select(c('tract','PM.15','BC.15','NO2.15','O3.15','SO2.15'))
+
+
+
+
+```
+
+
+```{r}
+NY_green_space<-NY_green_space%>%
+  left_join(air_poll,by='tract')
+
+
+```
+
+```{r}
+tract_exclusions_list_id<-tract_exclusions_list_id%>%
+  rename(tract='SID')
+nevi_preprocessed<-nevi_preprocessed%>%
+  left_join(NY_green_space,by='tract')
+  
+nevi_preprocessed<-nevi_preprocessed%>%
+  anti_join(tract_exclusions_list_id,by='tract')
 
 
 ```
