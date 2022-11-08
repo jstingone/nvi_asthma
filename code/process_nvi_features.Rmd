@@ -136,7 +136,8 @@ census_clean <- census_orig %>%
   dplyr::inner_join(census_features %>% dplyr::rename(tract = GEOID), by = "tract") %>%
   dplyr::select(-B25035_001E_update) 
 census_features<-census_features%>%
-  rename(tract=GEOID)
+  rename(tract=GEOID)%>%
+  select(-B25035_001E_update)
 
 ```
 
@@ -372,6 +373,37 @@ nevi_preprocessed<-nevi_preprocessed%>%
   
 nevi_preprocessed<-nevi_preprocessed%>%
   anti_join(tract_exclusions_list_id,by='tract')
+
+
+```
+
+```{r}
+nevi_preprocessed<-rowid_to_column(nevi_preprocessed,"row")
+vars_raceeth <- c('white_prop', 'aian_prop', 'nhpi_prop', 'race_other_prop', 'race_mult_prop', 'black_prop', 'asian_prop', 'aian_nhpi_mult_other_prop',
+                 'black_nonhisp_prop','asian_nonhisp_prop','aian_nhpi_mult_other_nonhisp_prop','hisp_prop', 'white_nonhisp_prop','aian_nonhisp_prop', 'nhpi_nonhisp_prop', 'race_other_nonhisp_prop', 'race_mult_nonhisp_prop')
+nevi_preprocessed<-nevi_preprocessed%>%
+  select(-c(vars_raceeth))
+```
+
+```{r}
+# Import header needed for Toxpi GUI
+header_toxpi <- read.csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/preprocessing/toxpi/header/toxpi_header.csv", header = F, colClasses = rep("character",68))
+# Create function to bind ToxPi header to NEVI features
+bind_toxpi_header <- function(df_header, df_features){
+  colnames_features <- names(df_features)
+  df_colnames_features <- data.frame(matrix(ncol = length(colnames_features), colnames_features))
+  rbind(setNames(df_header, colnames_features), # header
+        setNames(df_colnames_features, colnames_features),  # column names
+        df_features) # features
+}
+# Bind ToxPi header to NEVI features
+toxpi_export <- bind_toxpi_header(header_toxpi, nevi_preprocessed)
+
+```
+
+```{r}
+export(toxpi_export, "/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/preprocessing/nevi_tract_features_toxpiheader.csv", col.names = FALSE)
+saveRDS(nevi_preprocessed, "/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/preprocessing/nevi_tract_features.rds")
 
 
 ```
