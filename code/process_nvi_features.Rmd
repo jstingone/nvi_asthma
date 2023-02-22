@@ -358,6 +358,14 @@ NY_green_space<-NY_green_space%>%
 ```
 
 
+```{r}
+#Saving a copy of the NY_green_space data for visualization before applying any transformation
+
+export(NY_green_space, "/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/preprocessing/greenspace_data_for_plot.csv")
+
+
+```
+
 Now we clean the greenspace data, transforming variables so that larger, more positive values of features would correspond to greater vulnerability.
 
 ```{r}

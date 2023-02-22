@@ -16,7 +16,6 @@ library(nycgeo)
 library(rio)
 library(r2r)
 library(readxl)
-library(hash)
 library(tidycensus)
 library(LaplacesDemon)
 ```
@@ -53,7 +52,7 @@ In the asthma hospitalization data, there are '*' that represent that there the 
 ```{r}
 set.seed(42)
 asthma_hospitalization$Total<-asthma_hospitalization$Total%>%
-  map(function(x) gsub("[*]",floor(runif(1, min=1, max=10)),x))
+  map(function(x) gsub("[*]",floor(runif(1, min=1, max=9)),x))
 colnames(asthma_hospitalization)<-c('tract','cases')
 ```
 
@@ -105,7 +104,6 @@ asthma_hospitalization<-asthma_hospitalization%>%
 
 
 ```{r}
-m=hash() #Hash map that keeps tract of all the nevi_scores and all the sub-domain scores.
 
 best_weights=temp_model[["model"]]@txpWeights     #Copying the initial weights as the best weights. Will be replaced if a better correlation is obtained between the nevi and the asthma hospitalization count.
 
@@ -128,15 +126,19 @@ result_topxi_analyse<-result_topxi%>%
   relocate(asthma_ratio, .after = nevi)
 best_corr=cor(result_topxi_analyse$nevi,result_topxi_analyse$asthma_ratio,method='spearman') #Variable to keep tract of the maximum correlation achieved.
 
-print(paste0("Baseline Correlation Achieved with equal weights :",best_corr))
+print(paste0("Baseline Correlation Achieved with equal weights: ",best_corr))
 ```
 
 ```{r}
+
+sub_domain_name=names(result_topxi)
+results_df <- data.frame(Result = numeric(0), setNames(replicate(31, numeric(0), simplify = FALSE), (sub_domain_name[3:33])))
+
 set.seed(42)
-temp_weights<-rdirichlet(10000, rep(1,31))     
+temp_weights<-rdirichlet(30, rep(1,31))     
 #10000 possible weights: Generate 10000 combination of 31 numbers that sum to 1. These would form the weights of the sub-domain. We further explore which of these 10000 weights produce the best correlation between the asthma hospitalization and the nevi formed.
 
-for (i in (1:10000)){
+for (i in (1:30)){
   
 f.model <- TxpModel(txpSlices = temp_model[["model"]]@txpSlices, 
                     txpWeights = temp_weights[i,],
@@ -167,38 +169,28 @@ best_corr=current_cor
 best_weights=temp_weights[i,]
 }
 corr_weights=temp_weights[i,]
-m[current_cor]=corr_weights
+#m[current_cor]=corr_weights
+row_to_add <- c(current_cor, corr_weights)  # Combine the result and numbers into a row
+results_df <- rbind(results_df, row_to_add)  # Add the row to the data frame
 }
+results_df<- setNames(results_df, c('result',sub_domain_name[3:33]))
 ```
 
 ```{r}
 print(paste("Best Correlation Acheived : ", best_corr)) 
-sub_domain_name=names(result_topxi)
+
 for (i in (1:31))
 {
   print(paste(sub_domain_name[2+i],best_weights[i]))
 }
 
 ```
-```{r}
-#Store the sub-domain weights of the best 10 correlation results produced between nevi and asthma ratio
-top_10_keys=sort(keys(m),decreasing = TRUE)
-top_10_keys=top_10_keys[c(1:10)]
-top_10_key_value_pairs=m[top_10_keys]
 
-corr_data=data.frame("col_name"=names(result_topxi)[3:length(result_topxi)])
-corr_data['Best Value']=values(top_10_key_value_pairs[max(keys(top_10_key_value_pairs))])
-for(i in keys(top_10_key_value_pairs)){
-  corr_data[paste('Corr_Val',i)]=values(top_10_key_value_pairs[i])
-}
+```{r}
+result_df_sorted <- arrange(results_df, desc(result))
+
+# Select the top 10 rows
+top_10_result <- slice(result_df_sorted, 1:10)
+
 
 ```
-
-Temperory workspace document:
-1. Plots (Distribution of Green space data, water and air pollution data)
-2. Linear Model Analysis
-3. Clustering Analysis
-4. Correlation Analysis
-
-Things to try out:
-Gradient descent way of optimizing the sub-domain scores to attain a good correlation between the nevi index and the asthma hospitalization data
