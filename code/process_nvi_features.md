@@ -1,61 +1,106 @@
----
-title: "Preprocess NEVI Features"
-output: rmarkdown::github_document
----
+Preprocess NEVI Features
+================
 
-
-Below are steps to preprocess the features used to calculate the NEVI with the Toxicological Priority Index Graphical User Interface (ToxPi GUI).
+Below are steps to preprocess the features used to calculate the NEVI
+with the Toxicological Priority Index Graphical User Interface (ToxPi
+GUI).
 
 ### 1. Set Working Directory
 
-Set the working directory to one folder up from the RMarkdown file for later data export.
+Set the working directory to one folder up from the RMarkdown file for
+later data export.
 
-```{r,setup}
+``` r
 #setwd("~/Desktop/Columbia University/DASHI Project/nvi_asthma")
 knitr::opts_knit$set(warning = FALSE,root.dir = "~/Desktop/Columbia University/Research/DASHI Project/nvi_asthma/")
-
 ```
 
 ### 2. Load Required Libraries
 
 Load the following required libraries.
 
-```{r,libraries}
+``` r
 library(tidyverse)
+```
+
+    ## Warning: package 'tidyverse' was built under R version 4.1.2
+
+    ## ── Attaching packages ─────────────────────────────────────── tidyverse 1.3.2 ──
+    ## ✔ ggplot2 3.3.6      ✔ purrr   0.3.4 
+    ## ✔ tibble  3.1.8      ✔ dplyr   1.0.10
+    ## ✔ tidyr   1.2.1      ✔ stringr 1.4.1 
+    ## ✔ readr   2.1.2      ✔ forcats 0.5.2
+
+    ## Warning: package 'ggplot2' was built under R version 4.1.2
+
+    ## Warning: package 'tibble' was built under R version 4.1.2
+
+    ## Warning: package 'tidyr' was built under R version 4.1.2
+
+    ## Warning: package 'readr' was built under R version 4.1.2
+
+    ## Warning: package 'dplyr' was built under R version 4.1.2
+
+    ## Warning: package 'stringr' was built under R version 4.1.2
+
+    ## Warning: package 'forcats' was built under R version 4.1.2
+
+    ## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+    ## ✖ dplyr::filter() masks stats::filter()
+    ## ✖ dplyr::lag()    masks stats::lag()
+
+``` r
 library(rio)
 library(stringi)
 ```
+
+    ## Warning: package 'stringi' was built under R version 4.1.2
 
 ### 3. Import the Data
 
 Import the following Census tract-level data files:
 
--   [U.S. Centers for Disease Control and Prevention PLACES in 2020](https://chronicdata.cdc.gov/500-Cities-Places/PLACES-Local-Data-for-Better-Health-Place-Data-202/q8xq-ygsk)
+-   [U.S. Centers for Disease Control and Prevention PLACES in
+    2020](https://chronicdata.cdc.gov/500-Cities-Places/PLACES-Local-Data-for-Better-Health-Place-Data-202/q8xq-ygsk)
 
-    -   We previously downloaded this data in the link above and saved the file in `data/raw/US CDC PLACES`
+    -   We previously downloaded this data in the link above and saved
+        the file in `data/raw/US CDC PLACES`
 
--   [U.S. Census American Community Survey, 2015-2019 5-year estimates](https://www.census.gov/data/developers/data-sets/acs-5year.2015.html)
+-   [U.S. Census American Community Survey, 2015-2019 5-year
+    estimates](https://www.census.gov/data/developers/data-sets/acs-5year.2015.html)
 
-    -   We previously downloaded this data using our code `A1-download-census-data.Rmd` and saved the file in `data/raw/US Census`
-    
+    -   We previously downloaded this data using our code
+        `A1-download-census-data.Rmd` and saved the file in
+        `data/raw/US Census`
 
-
-```{r,import_cdc_census}
+``` r
 # US CDC PLACES data, 2016 release
 PLACES_orig <- read_csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/US CDC PLACES/PLACES_2015_release.csv")
-# US Census, American Community Survey data 2015 5-Year Estimates
-census_orig <- readRDS( file = "/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/US Census/us_census_acs_2015.rds")
-
 ```
 
+    ## Rows: 27210 Columns: 63
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## chr (34): StateAbbr, PlaceName, PlaceFIPS, TractFIPS, Place_TractID, ACCESS2...
+    ## dbl (29): Population2010, ACCESS2_CrudePrev, ARTHRITIS_CrudePrev, BINGE_Crud...
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
+# US Census, American Community Survey data 2015 5-Year Estimates
+census_orig <- readRDS( file = "/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/US Census/us_census_acs_2015.rds")
+```
 
 ### 4. Clean the data
 
 #### 4.1. Clean U.S. CDC PLACES Data
 
-We first cleaned the U.S. CDC PLACES data, transforming variables so that larger, more positive values of features would correspond to greater vulnerability.
+We first cleaned the U.S. CDC PLACES data, transforming variables so
+that larger, more positive values of features would correspond to
+greater vulnerability.
 
-```{r}
+``` r
 PLACES_clean <- PLACES_orig %>% 
   dplyr::mutate(tract = as.character(TractFIPS),
                 CHECKUP_CrudePrev = -CHECKUP_CrudePrev - min(-CHECKUP_CrudePrev, na.rm = TRUE),
@@ -72,16 +117,18 @@ PLACES_clean <- PLACES_orig %>%
     'MHLTH_CrudePrev',  'PHLTH_CrudePrev',  'TEETHLOST_CrudePrev',  'CHECKUP_CrudePrev',  'COREM_CrudePrev',  
     'COREW_CrudePrev',  'DENTAL_CrudePrev',  'CHOLSCREEN_CrudePrev',  
     'COLON_SCREEN_CrudePrev',  'MAMMOUSE_CrudePrev',  'ACCESS2_CrudePrev') 
-
 ```
-
 
 #### 4.2. Clean U.S. Census ACS Data
 
-We cleaned the U.S. Census ACS data, calculating proportions and transforming features so that larger values of features would correspond to greater vulnerability. This code below still includes population (`misc_pop`) to later generate a list of excluded tracts and race and ethnicity variables that are not included in the NEVI (only used in sensitivity analysis).
+We cleaned the U.S. Census ACS data, calculating proportions and
+transforming features so that larger values of features would correspond
+to greater vulnerability. This code below still includes population
+(`misc_pop`) to later generate a list of excluded tracts and race and
+ethnicity variables that are not included in the NEVI (only used in
+sensitivity analysis).
 
-
-```{r}
+``` r
 census_features <- census_orig %>% 
   dplyr::as_tibble() %>% 
   dplyr::transmute(
@@ -177,29 +224,32 @@ census_clean <- census_orig %>%
 census_features<-census_features%>%
   rename(tract=GEOID)%>%
   select(-B25035_001E_update)
-
 ```
-
 
 ### 5. Additional Preprocessing
 
 #### 5.1. Prepare Exclusions List
 
--   We imported a list of Census tracts that we previously created to be excluded because they had
+-   We imported a list of Census tracts that we previously created to be
+    excluded because they had
 
     1.  A population of less than 20 or
 
-    2.  At least 1 missing feature used in the NEVI or Neighborhood Deprivation Index (NDI), one of the indices to which the NEVI was compared.
+    2.  At least 1 missing feature used in the NEVI or Neighborhood
+        Deprivation Index (NDI), one of the indices to which the NEVI
+        was compared.
 
--   The exclusion list we used considers features used in *both* the NEVI and NDI.
+-   The exclusion list we used considers features used in *both* the
+    NEVI and NDI.
 
-    -   We have also provided code (commented out below) that can be used to create a list of Census tracts to be excluded *only* based on features used in the NEVI.
+    -   We have also provided code (commented out below) that can be
+        used to create a list of Census tracts to be excluded *only*
+        based on features used in the NEVI.
 
--   We do not currently include race and ethnicity in the NEVI, but we later include these variables for sensitivity analysis.
+-   We do not currently include race and ethnicity in the NEVI, but we
+    later include these variables for sensitivity analysis.
 
-
-
-```{r}
+``` r
 # Features not included in the NEVI
 vars_raceeth <- c('white_prop', 'aian_prop', 'nhpi_prop', 'race_other_prop', 'race_mult_prop', 'black_prop', 'asian_prop', 'aian_nhpi_mult_other_prop',
                  'black_nonhisp_prop','asian_nonhisp_prop','aian_nhpi_mult_other_nonhisp_prop','hisp_prop', 'white_nonhisp_prop','aian_nonhisp_prop', 'nhpi_nonhisp_prop', 'race_other_nonhisp_prop', 'race_mult_nonhisp_prop')
@@ -216,19 +266,30 @@ tract_exclusions_list <- import("/Users/karveandhan/Desktop/Columbia University/
 tract_exclusions_list_id <- tract_exclusions_list %>% 
   dplyr::filter(flag_exclude_FINAL == 1) %>% 
   dplyr::transmute(SID = as.character(GEOID))
-
-
 ```
 
 ### 6.Import Green Space Data
 
 -   [EnviroAtlas Data](https://www.epa.gov/enviroatlas/enviroatlas-data)
 
-    -   We download this data from https://www.epa.gov/enviroatlas/enviroatlas-data and add then to the files in `data/raw/greenspace`
+    -   We download this data from
+        <https://www.epa.gov/enviroatlas/enviroatlas-data> and add then
+        to the files in `data/raw/greenspace`
 
-```{r}
+``` r
 #Population of each census tract
 NY_Block_Population <- read_csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/greenspace/NYNY_BG_Pop.csv")
+```
+
+    ## Rows: 6378 Columns: 13
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## dbl (13): bgrp, SUM_HOUSIN, SUM_POP10, under_1, under_1pct, under_13, under_...
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
 NY_Block_Population<-NY_Block_Population%>%
   dplyr::select(c(bgrp,SUM_POP10))%>%
   dplyr::rename(population='SUM_POP10')
@@ -237,15 +298,24 @@ NY_Block_Population<-NY_Block_Population%>%
   dplyr::mutate(bgrp_tract=substr(bgrp,1,11))
 NY_tract_population<- NY_Block_Population %>% 
   group_by(bgrp_tract) %>% 
-  summarise(population = sum(population))%>%     #We have data in census block level and now we convert them to census tract level
+  summarise(population = sum(population))%>%
   rename(tract='bgrp_tract')
-
-
 ```
 
-```{r}
+``` r
 #Total land area in 1% Annual Chance Flood Hazard area (m2)
 NY_flood_plain<-read_csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/greenspace/NYNY_Floodplain.csv")
+```
+
+    ## Rows: 6378 Columns: 13
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## dbl (13): bgrp, FP1_Land_M, FP1_Land_P, FP02_Land_M, FP02_Land_P, FP1_Imp_M,...
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
 NY_flood_plain<-NY_flood_plain%>%
   select(c(bgrp,FP1_Land_M))%>%
   mutate(bgrp_tract=substr(bgrp,1,11))%>%
@@ -253,12 +323,22 @@ NY_flood_plain<-NY_flood_plain%>%
   group_by(bgrp_tract)%>%
   summarise(total_area_flood_1=sum(FP1_Land_M))%>%
   rename(tract='bgrp_tract')
-
 ```
 
-```{r}
+``` r
 #m2 Area of Tree and Forest, Grass and Herbaceous, Total Area, Total Land Area
 NY_iTree<-read_csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/greenspace/NYNY_iTree.csv")
+```
+
+    ## Rows: 6378 Columns: 136
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## dbl (136): bgrp, MinCORemov, CORemoval, MaxCORemov, MinNO2Remo, NO2Removal, ...
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
 NY_iTree<-NY_iTree%>%
   select(c(bgrp,TAFSQM,GAHSQM,LNDSQM,TTLSQM))%>%
   mutate(bgrp_tract=substr(bgrp,1,11))%>%
@@ -266,15 +346,38 @@ NY_iTree<-NY_iTree%>%
   group_by(bgrp_tract)%>%
   summarise_each(funs(sum))%>%
   rename(tract='bgrp_tract')
-
-
 ```
 
+    ## Warning: `summarise_each_()` was deprecated in dplyr 0.7.0.
+    ## Please use `across()` instead.
 
-```{r}
+    ## Warning: `funs()` was deprecated in dplyr 0.8.0.
+    ## Please use a list of either functions or lambdas: 
+    ## 
+    ##   # Simple named list: 
+    ##   list(mean = mean, median = median)
+    ## 
+    ##   # Auto named with `tibble::lst()`: 
+    ##   tibble::lst(mean, median)
+    ## 
+    ##   # Using lambdas
+    ##   list(~ mean(., trim = .2), ~ median(., na.rm = TRUE))
+
+``` r
 # Estimated residential population within 300m of a busy roadway with < 25 percent tree buffer
 
 NYNY_NrRd_Pop<-read_csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/greenspace/NYNY_NrRd_Pop.csv")
+```
+
+    ## Rows: 6378 Columns: 7
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## dbl (7): bgrp, IBuff_Pop, SBuff_Pop, Buff_Pop, Buff_Pct, Lane_PctSB, Lane_PctIB
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
 NYNY_NrRd_Pop[NYNY_NrRd_Pop==-99999]=0
 NYNY_NrRd_Pop<-NYNY_NrRd_Pop%>%
   mutate(bgrp_tract=substr(bgrp,1,11))%>%
@@ -283,14 +386,23 @@ NYNY_NrRd_Pop<-NYNY_NrRd_Pop%>%
   group_by(bgrp_tract)%>%
   summarize_each(funs(sum))%>%
   rename(tract='bgrp_tract')
-
-
 ```
 
-```{r}
+``` r
 # Estimated residential population not within 500m of a park entrance.
 
 NYNY_Park_Pop<-read_csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/greenspace/NYNY_Park_Pop.csv")
+```
+
+    ## Rows: 6378 Columns: 5
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## dbl (5): bgrp, IWDP_Pop, BWDP_Pop, IWDP_Pct, BWDP_Pct
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
 NYNY_Park_Pop<-NYNY_Park_Pop%>%
   select(c(bgrp,BWDP_Pop))
 NYNY_Park_Pop[NYNY_Park_Pop==-99999]=0
@@ -300,13 +412,23 @@ NYNY_Park_Pop<-NYNY_Park_Pop%>%
   group_by(bgrp_tract)%>%
   summarise_each(funs(sum))%>%
   rename(tract='bgrp_tract')
-
 ```
 
-```{r}
+``` r
 # Residential population with potential views of water
 
 NYNY_WaterWV<-read_csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/greenspace/NYNY_WaterWV.csv")
+```
+
+    ## Rows: 6378 Columns: 3
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## dbl (3): bgrp, WVW_Pop, WVW_Pct
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
 NYNY_WaterWV[NYNY_WaterWV==-99999]=0
 NYNY_WaterWV<-NYNY_WaterWV%>%
   mutate(bgrp_tract=substr(bgrp,1,11))%>%
@@ -314,23 +436,18 @@ NYNY_WaterWV<-NYNY_WaterWV%>%
   group_by(bgrp_tract)%>%
   summarise_each(funs(sum))%>%
   rename(tract='bgrp_tract')
-
-
 ```
 
-
-```{r}
+``` r
 #Combining data-set from all three data sources upon pre-processing
 nevi_preprocessed<-as.data.frame(census_features$tract)
 colnames(nevi_preprocessed)<-c("tract")
 nevi_preprocessed<-nevi_preprocessed%>%
   left_join(census_features,by='tract')%>% 
   left_join(PLACES_clean,by='tract')
-
-
 ```
 
-```{r}
+``` r
 #Forming a greenspace dataset by combining all individual greenspace featuers.
 NY_green_space<-as.data.frame(nevi_preprocessed$tract)
 colnames(NY_green_space)<-c('tract')
@@ -341,13 +458,12 @@ NY_green_space<-NY_green_space%>%
  left_join(NYNY_NrRd_Pop,by='tract')%>%
  left_join(NYNY_Park_Pop,by='tract')%>%
  left_join(NYNY_WaterWV,by='tract')
-
-
 ```
 
-For features like population and area, we transform them from count or m2 to proportion
+For features like population and area, we transform them from count or
+m2 to proportion
 
-```{r}
+``` r
 NY_green_space<-NY_green_space%>%
   mutate(WVW_Pop=WVW_Pop/population)%>%
   mutate(BWDP_Pop=BWDP_Pop/population)%>%
@@ -357,29 +473,29 @@ NY_green_space<-NY_green_space%>%
   mutate(GAHSQM=GAHSQM/LNDSQM)
 ```
 
+Now we clean the greenspace data, transforming variables so that larger,
+more positive values of features would correspond to greater
+vulnerability.
 
-Now we clean the greenspace data, transforming variables so that larger, more positive values of features would correspond to greater vulnerability.
-
-```{r}
+``` r
 NY_green_space<-NY_green_space%>%
   mutate(WVW_Pop=-WVW_Pop-min(-WVW_Pop, na.rm = TRUE),
          TAFSQM=-TAFSQM-min(-TAFSQM, na.rm = TRUE),
          GAHSQM=-GAHSQM-min(-GAHSQM, na.rm = TRUE))
 NY_green_space<-NY_green_space%>%
   select(-c('population','TTLSQM','LNDSQM'))
-
 ```
-
 
 ### 7.Import and clean toxic elements data
 
--   [Industrial Pollutants in air,water or soil](https://data.diversitydatakids.org/dataset/coi20-child-opportunity-index-2-0-database/resource/f16fff12-b1e5-4f60-85d3-3a0ededa30a0)
+-   [Industrial Pollutants in air,water or
+    soil](https://data.diversitydatakids.org/dataset/coi20-child-opportunity-index-2-0-database/resource/f16fff12-b1e5-4f60-85d3-3a0ededa30a0)
 
-    -   We download this data from https://data.diversitydatakids.org/dataset/coi20-child-opportunity-index-2-0-database/resource/f16fff12-b1e5-4f60-85d3-3a0ededa30a0 and add then to the files in `data/raw/toxic.csv`
+    -   We download this data from
+        <https://data.diversitydatakids.org/dataset/coi20-child-opportunity-index-2-0-database/resource/f16fff12-b1e5-4f60-85d3-3a0ededa30a0>
+        and add then to the files in `data/raw/toxic.csv`
 
-
-
-```{r}
+``` r
 #Index of toxic chemicals released by industrial facilities, converted to natural log units.
 toxic_material_data<-read.csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/toxic.csv")
 toxic_material_data<-toxic_material_data%>%
@@ -390,7 +506,7 @@ toxic_material_data<-toxic_material_data%>%     #Use only 2015 data
   filter(year==2015)
 ```
 
-```{r}
+``` r
 # Attach this toxic material data to the greenspace data
 toxic_material_data<-toxic_material_data%>%
   rename(tract='geoid')
@@ -398,17 +514,26 @@ toxic_material_data$tract<-as.character(toxic_material_data$tract)
 NY_green_space<-NY_green_space%>%
   left_join(toxic_material_data%>%
               select('tract','HE_RSEI'),by='tract')
-
-
 ```
 
 ### 7.Import and clean air pollution data
 
--  Airpollution file: data/processed/AirPoll_ct2010.csv
+-   Airpollution file: data/processed/AirPoll\_ct2010.csv
 
-
-```{r}
+``` r
 air_poll<-read_csv('/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/AirPoll_ct2010.csv')
+```
+
+    ## New names:
+    ## Rows: 2165 Columns: 54
+    ## ── Column specification
+    ## ──────────────────────────────────────────────────────── Delimiter: "," dbl
+    ## (54): ...1, ct2010, PM.09, BC.09, NO2.09, O3.09, SO2.09, PM.10, BC.10, N...
+    ## ℹ Use `spec()` to retrieve the full column specification for this data. ℹ
+    ## Specify the column types or set `show_col_types = FALSE` to quiet this message.
+    ## • `` -> `...1`
+
+``` r
 air_poll$ct2010<-as.character(air_poll$ct2010)
 air_poll$code<-stri_sub(air_poll$ct2010, 1, 1)
  
@@ -425,19 +550,15 @@ air_poll<-air_poll%>%
 #Selecting the gas/air components for the year 2015
 air_poll<-air_poll%>%
   select(c('tract','PM.15','BC.15','NO2.15','O3.15','SO2.15'))
-
 ```
 
-
-```{r}
+``` r
 #Attaching the airpollution data to the greenspace data
 NY_green_space<-NY_green_space%>%
   left_join(air_poll,by='tract')
-
-
 ```
 
-```{r}
+``` r
 tract_exclusions_list_id<-tract_exclusions_list_id%>%
   rename(tract='SID')
 
@@ -447,21 +568,17 @@ tract_exclusions_list_id<-tract_exclusions_list_id%>%
 nevi_preprocessed<-nevi_preprocessed%>%
   left_join(NY_green_space,by='tract')
   
-#Remove the census tract that belong to the exclusion list 
-#(1.  A population of less than 20 or  At least 1 missing feature used in the NEVI or Neighborhood Deprivation Index (NDI), one of the indices to which the NEVI was compared)
+#Remove the census tract that belong to the exclusion list
 nevi_preprocessed<-nevi_preprocessed%>%
   anti_join(tract_exclusions_list_id,by='tract')
-
-
 ```
-
 
 ### 8. Additional Preprocessing
 
--   We do not currently include race and ethnicity in the NEVI, but we later include these variables for sensitivity analysis.
+-   We do not currently include race and ethnicity in the NEVI, but we
+    later include these variables for sensitivity analysis.
 
-
-```{r}
+``` r
 nevi_preprocessed<-rowid_to_column(nevi_preprocessed,"row")
 vars_raceeth <- c('white_prop', 'aian_prop', 'nhpi_prop', 'race_other_prop', 'race_mult_prop', 'black_prop', 'asian_prop', 'aian_nhpi_mult_other_prop',
                  'black_nonhisp_prop','asian_nonhisp_prop','aian_nhpi_mult_other_nonhisp_prop','hisp_prop', 'white_nonhisp_prop','aian_nonhisp_prop', 'nhpi_nonhisp_prop', 'race_other_nonhisp_prop', 'race_mult_nonhisp_prop')
@@ -469,11 +586,19 @@ nevi_preprocessed<-nevi_preprocessed%>%
   select(-c(vars_raceeth))
 ```
 
+    ## Note: Using an external vector in selections is ambiguous.
+    ## ℹ Use `all_of(vars_raceeth)` instead of `vars_raceeth` to silence this message.
+    ## ℹ See <https://tidyselect.r-lib.org/reference/faq-external-vector.html>.
+    ## This message is displayed once per session.
+
 ### 9. Add ToxPi Header to NEVI Features
 
-We added a header that we manually created needed to specify options to create the NEVI in the ToxPi GUI. The header contains information about the slices, slice weights, name of the slices, and color of the slices. For example:
+We added a header that we manually created needed to specify options to
+create the NEVI in the ToxPi GUI. The header contains information about
+the slices, slice weights, name of the slices, and color of the slices.
+For example:
 
-```{r}
+``` r
 # Import header needed for Toxpi GUI
 header_toxpi <- read.csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/preprocessing/toxpi/header/toxpi_header.csv", header = F, colClasses = rep("character",68))
 # Create function to bind ToxPi header to NEVI features
@@ -486,17 +611,15 @@ bind_toxpi_header <- function(df_header, df_features){
 }
 # Bind ToxPi header to NEVI features
 toxpi_export <- bind_toxpi_header(header_toxpi, nevi_preprocessed)
-
 ```
 
 ### 10. Export NEVI Features with and without ToxPi Header
 
-We exported our data into a spreadsheet with the NEVI features with and without the header needed to perform form Index using ToxPi in R (library - toxpiR)
+We exported our data into a spreadsheet with the NEVI features with and
+without the header needed to perform form Index using ToxPi in R
+(library - toxpiR)
 
-
-```{r}
+``` r
 export(toxpi_export, "/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/preprocessing/nevi_tract_features_toxpiheader.csv", col.names = FALSE)
 saveRDS(nevi_preprocessed, "/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/preprocessing/nevi_tract_features.rds")
-
-
 ```
