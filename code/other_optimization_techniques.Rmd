@@ -1,0 +1,226 @@
+---
+title: "optimization methods"
+author: "Karveandhan"
+date: "12/16/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(toxpiR)
+library(tidyverse)
+library(dplyr)
+library(nycgeo)
+library(rio)
+library(r2r)
+library(readxl)
+library(tidycensus)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+temp_model<-txpImportGui("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/preprocessing/nevi_tract_features_toxpiheader.csv")
+temp_model[["model"]]
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+
+```{r}
+
+asthma_hospitalization<-read_excel("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/AsthmaHosp_2016_lt17age.xlsx")
+#asthma_hospitalization$`Census Tract`<-gsub(asthma_hospitalization$`Census Tract`,".","")
+asthma_hospitalization<-asthma_hospitalization[0:2266,]
+asthma_hospitalization$`Census Tract`<-asthma_hospitalization$`Census Tract`%>%
+   map(function(x) gsub("[.]","",x))
+asthma_hospitalization$`Census Tract`<-paste0("36",asthma_hospitalization$`Census Tract`)
+#colnames(asthma_hospitalization)<-
+asthma_hospitalization<-asthma_hospitalization%>%
+  select(c('Census Tract','Total'))
+```
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+set.seed(42)
+asthma_hospitalization$Total<-asthma_hospitalization$Total%>%
+  map(function(x) gsub("[*]",floor(runif(1, min=1, max=6)),x))
+colnames(asthma_hospitalization)<-c('tract','cases')
+```
+
+```{r}
+census_api_key('23381961ae708c9374e30013b8f40b3485999b21') 
+options(tigris_use_cache = TRUE)
+##### Specify county names for Census data download
+county_names <- c('New York County', 'Kings County', 'Bronx County', 'Richmond County', 'Queens County')
+vars <- c('B01001_027E','B01001_028E','B01001_029E','B01001_030E','B01001_003E','B01001_004E','B01001_005E','B01001_006E')
+population_under18 <- get_acs(geography = "tract", state = "NY", county = county_names, variables = vars, year = 2015, survey = "acs5", output = "wide", geometry = TRUE, keep_geo_vars = TRUE) %>% 
+  dplyr::as_tibble() %>% 
+  dplyr::select(-geometry)
+population_under18<-population_under18%>%
+  transmute(tract=GEOID,female_u18=B01001_027E+B01001_028E+B01001_029E+B01001_030E,
+            male_u18=B01001_003E+B01001_004E+B01001_005E+B01001_006E,
+            total_u18=female_u18+male_u18)
+
+
+
+```
+
+```{r}
+asthma_hospitalization<-asthma_hospitalization%>%
+  left_join(population_under18,by='tract')
+asthma_hospitalization$cases<-as.integer(asthma_hospitalization$cases)
+asthma_hospitalization<-asthma_hospitalization%>%
+  filter(tract %in% nevi_preprocessed$tract)
+asthma_hospitalization<-asthma_hospitalization%>%
+  mutate(asthma_ratio=cases/total_u18)
+asthma_hospitalization<-na.omit(asthma_hospitalization)
+nevi_preprocessed<-nevi_preprocessed%>%
+  filter(tract %in% asthma_hospitalization$tract)
+asthma_hospitalization<-asthma_hospitalization%>%
+  mutate(asthma_ratio=asthma_ratio*1000)
+```
+
+```{r}
+asthma_corr<-result_topxi_analyse$asthma_ratio
+best_weights=temp_model[["model"]]@txpWeights
+
+calculate_correlation <- function(weights) {
+  # Calculate the correlation between the weights and the data
+  correlation <- cor(weights, data)
+  # Return the correlation
+  return(correlation)
+}
+
+
+
+
+```
+
+
+```{r}
+# Define a function that calculates the correlation between the features and the other data using the normalized weights
+correlation_function <- function(weights) {
+  # Normalize the weights so they sum to 1
+  weights <- weights/sum(weights)
+  
+  # Calculate the correlation between the features and the other data using the normalized weights
+  f.model <- TxpModel(txpSlices = temp_model[["model"]]@txpSlices, 
+                    txpWeights = weights,
+                    txpTransFuncs = temp_model[["model"]]@txpTransFuncs)
+
+
+  f.results <- txpCalculateScores(model = f.model, 
+                                input = nevi_preprocessed,
+                                id.var = 'tract' )
+  result_topxi <- data.frame(f.results@txpIDs)
+  result_topxi$nevi <- f.results@txpScores
+  current_nevi <- f.results@txpScores
+                                
+  correlation <- cor(current_nevi, asthma_corr)
+  
+  # Return the correlation
+  return(correlation)
+}
+
+# Set the initial weights
+initial_weights <- rep(1/31, 31)
+
+# Use optim() to maximize the correlation function by searching for the optimal weights
+optimized_weights <- optim(par = initial_weights, fn = correlation_function, method = "L-BFGS-B",
+                           lower = rep(0, 31), upper = rep(1, 31))
+
+# The optimized weights are stored in the "par" element of the output
+optimized_weights$par
+
+
+```
+
+```{r}
+optimized_weights$par
+final.model <- TxpModel(txpSlices = temp_model[["model"]]@txpSlices, 
+                    txpWeights = optimized_weights$par,
+                    txpTransFuncs = temp_model[["model"]]@txpTransFuncs)
+final.results <- txpCalculateScores(model = final.model, 
+                                input = nevi_preprocessed,
+                                id.var = 'tract' )
+result_topxi<-data.frame(final.results@txpIDs)
+result_topxi$nevi<-final.results@txpScores
+current_nevi<-final.results@txpScores
+cor(current_nevi,asthma_corr)
+```
+
+```{r}
+# Define a function that calculates the correlation between the features and the other data using the normalized weights
+correlation_function <- function(weights) {
+  # Normalize the weights so they sum to 1
+  weights <- weights/sum(weights)
+  
+  # Calculate the correlation between the features and the other data using the normalized weights
+  f.model <- TxpModel(txpSlices = temp_model[["model"]]@txpSlices, 
+                    txpWeights = weights,
+                    txpTransFuncs = temp_model[["model"]]@txpTransFuncs)
+
+
+  f.results <- txpCalculateScores(model = f.model, 
+                                input = nevi_preprocessed,
+                                id.var = 'tract' )
+  result_topxi <- data.frame(f.results@txpIDs)
+  result_topxi$nevi <- f.results@txpScores
+  current_nevi <- f.results@txpScores
+                                
+  correlation <- cor(current_nevi, asthma_corr)
+  
+  # Return the negative correlation to maximize it
+  return(correlation)
+}
+
+# Set the initial weights
+initial_weights <- rep(1/31, 31)
+
+# Use optim() to maximize the correlation function by searching for the optimal weights
+optimized_weights <- optim(par = initial_weights, fn = correlation_function, method = "Nelder-Mead")
+
+# The optimized weights are stored in the "par" element of the output
+optimized_weights$par
+```
+
+
+```{r}
+optimized_weights$par
+final.model <- TxpModel(txpSlices = temp_model[["model"]]@txpSlices, 
+                    txpWeights = optimized_weights$par,
+                    txpTransFuncs = temp_model[["model"]]@txpTransFuncs)
+final.results <- txpCalculateScores(model = final.model, 
+                                input = nevi_preprocessed,
+                                id.var = 'tract' )
+result_topxi<-data.frame(final.results@txpIDs)
+result_topxi$nevi<-final.results@txpScores
+current_nevi<-final.results@txpScores
+cor(current_nevi,asthma_corr)
+```
+
+
+```{r}
+library(DEoptim)
+# Set the initial weights
+initial_weights <- rep(1/31, 31)
+
+# Use DEoptim() to maximize the correlation function by searching for the optimal weights
+optimized_weights <- DEoptim(fn = correlation_function, lower = rep(0, 31), upper = rep(1, 31),
+                             control = list(NP = 50, F = 0.8, CR = 0.9, itermax = 1000, trace = FALSE))
+
+# The optimized weights are stored in the "x" element of the output
+optimized_weights$x
+
+
+
+
+```

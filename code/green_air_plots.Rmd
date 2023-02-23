@@ -5,13 +5,46 @@ date: "2/22/2023"
 output: html_document
 ---
 
+
+### 1. Load Required Libraries
+
+Load the following required libraries.
+
+```{r, libraries}
+library(tidyverse)
+library(stringi)
+library(rio)
+library(factoextra)
+library(cluster)
+library(skimr)
+# Tables
+library(janitor)
+library(gtsummary)
+# Mapping
+library(sf)
+library(ggpubr)
+library(ggsn)
+library(ggspatial)
+library(nycgeo)
+library(tigris)
+library(ggsflabel) # Ref: https://yutannihilation.github.io/ggsflabel/index.html
+# Plots
+library(ggpubr)
+library(colorBlindness)
+library(ggpattern) # Ref: https://coolbutuseless.github.io/package/ggpattern/index.html
+library(gplots) # heat map
+```
+
+### 2. Import Greenspace and Air-pollution data
+
 ```{r setup}
 green_space_plot=read.csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/preprocessing/greenspace_data_for_plot.csv")
 ```
 
-
+### 3. Create spatial objects
 
 ```{r}
+### IMPORT: NYC specific Census tract/borough boundaries
 tract_nyc_spa1 <- nycgeo::nyc_boundaries(geography = "tract") %>% 
   dplyr::transmute(Tract_FIPS = geoid) %>%
   st_as_sf() %>%
@@ -21,29 +54,34 @@ borough_nyc_spa1 <- nycgeo::nyc_boundaries(geography = "borough") %>%
   st_as_sf() %>%
   st_set_crs(2263)
 
+# Spatial: crs = "+init=epsg:2263"
+  # Included
 tract_gs_final_sp1<-tract_nyc_spa1%>%
-  dplyr::inner_join(green_space_plot %>% mutate(Tract_FIPS=as.character(tract)%>% trimws()),by ='Tract_FIPS')
+  dplyr::inner_join(green_space_plot %>% mutate(Tract_FIPS=as.character(tract)%>% trimws()),by ='Tract_FIPS') 
 
 tract_gs_exclude_sp1<-tract_nyc_spa1%>%
-  dplyr::anti_join(green_space_plot %>% mutate(Tract_FIPS=as.character(tract)%>% trimws()),by ='Tract_FIPS')
+  dplyr::anti_join(green_space_plot %>% mutate(Tract_FIPS=as.character(tract)%>% trimws()),by ='Tract_FIPS')  #Excluding the tract in the exclusion list
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
+### 4. Figures for GreenSpace
 
 ```{r}
+#### CREATE: Functions to create maps
 gen_fig_green_space<-function(dfin,dfexcl,dfborough,fill_var,fill_color,fill_label,lab_borough)
 {
-  plot_1<-ggplot()+
-    geom_sf(data=dfin,aes(fill=!!sym(fill_var)),color=NA)+
+  plot_1<-ggplot()+     # tracts
+    geom_sf(data=dfin,aes(fill=!!sym(fill_var)),color=NA)+     # tracts, excluded
     geom_sf(data=dfexcl,color="grey30",fill="grey30")+
     geom_sf(data=dfborough,color='grey20',fill=NA,size=0.2)+
-    theme_minimal()+
+    theme_minimal()+    # Alt: ggthemes::theme_map()
+    # boroughs
     ggspatial::annotation_north_arrow(location = 'br', height = unit(1,'cm'), width = unit(1.1, 'cm'), pad_x = unit(1.5, "cm"), pad_y = unit(0.5, "cm"), style = north_arrow_orienteering(fill = c('black','black'), text_size = 11))+
      ggsn::scalebar(data = dfborough, dist = 10, dist_unit = "mi", height = 0.01, st.size = 5, st.dist = 0.05, transform = FALSE, model = 'WGS84', location = "bottomright")+
+           # Alt: ggsn::north(data = dfborough, location = "topleft", symbol = 10, scale = 0.10) + # use the ggspatial package in order to export to .eps properly
+        # Alt: ggspatial::annotation_scale(plot_unit = "mi", location = 'br') + #bgcolor("lightcyan") + #snow2 #plot_unit = "mi", pad_x = unit(7.5, "cm"), pad_y = unit(-1, "cm")
+
     labs(fill = fill_label)+
-    scale_fill_gradient(low = "whitesmoke", high = fill_color)+
+    scale_fill_gradient(low = "whitesmoke", high = fill_color)+ # na.value = "gray30"
     theme(legend.title = element_text(face = "bold", size = 15), # plot.title = element_text(hjust = 0.75, face = "bold", size = 15),
           legend.text = element_text(size = 12),
           legend.spacing.x = unit(0.5, 'cm'),
@@ -51,7 +89,7 @@ gen_fig_green_space<-function(dfin,dfexcl,dfborough,fill_var,fill_color,fill_lab
           axis.line = element_blank(),
           axis.text = element_blank(),
           axis.title = element_blank(),
-          panel.grid = element_blank())
+          panel.grid = element_blank())  # plot.caption = element_text(hjust = 0, size = 10, face = "italic"), legend.position = c(1,0.5), plot.background = element_rect(fill = "lightcyan")
     
   return(plot_1)
     
@@ -69,6 +107,8 @@ block_population_fig
 view_of_water_fig
 
 ```
+
+### 5. Preprocessing the Air Pollution data
 
 
 ```{r pressure, echo=FALSE}
@@ -90,6 +130,7 @@ air_poll_inclu<-air_poll_inclu%>%
   select(-c(...1))
 ```
 
+### 6.Finding the mean of all 5 gas components over all years from 2009 to 2019 for visulization
 
 
 ```{r}
@@ -209,6 +250,7 @@ fig4<-ggplot(ny_data0, aes(x = O3_Year, y = O3, fill = County, color = County))+
 ```
 
 ```{r}
+#SO2 data is only availble from 2009 to 2016
 temp_air_plot<-air_poll_inclu%>%
   group_by(code)%>%
    summarise(mean(SO2.09),mean(SO2.10),mean(SO2.11),mean(SO2.12),mean(SO2.13),mean(SO2.14),mean(SO2.15),mean(SO2.16))
