@@ -2,7 +2,7 @@ Neighborhood Environmental Vulnerability Index, 2015: Downloading U.S.
 Census Data
 ================
 
-Below are steps to download data from the [U.S. Census 2015-2019 5-year
+Below are steps to download data from the [U.S. Census 2015 5-year
 estimates](https://www.census.gov/data/developers/data-sets/acs-5year.2015.html).
 We have already included the downloaded file in our repository:
 `data/raw/US Census/us_census_acs_2015.rds`.

@@ -94,7 +94,7 @@ best_weights=temp_model[["model"]]@txpWeights
 
 calculate_correlation <- function(weights) {
   # Calculate the correlation between the weights and the data
-  correlation <- cor(weights, data)
+  correlation <- cor(weights, data,method='spearman')
   # Return the correlation
   return(correlation)
 }
@@ -124,7 +124,7 @@ correlation_function <- function(weights) {
   result_topxi$nevi <- f.results@txpScores
   current_nevi <- f.results@txpScores
                                 
-  correlation <- cor(current_nevi, asthma_corr)
+  correlation <- cor(current_nevi, asthma_corr,method='spearman')
   
   # Return the correlation
   return(correlation)
@@ -154,7 +154,7 @@ final.results <- txpCalculateScores(model = final.model,
 result_topxi<-data.frame(final.results@txpIDs)
 result_topxi$nevi<-final.results@txpScores
 current_nevi<-final.results@txpScores
-cor(current_nevi,asthma_corr)
+cor(current_nevi,asthma_corr,method='spearman')
 ```
 
 ```{r}
@@ -176,7 +176,7 @@ correlation_function <- function(weights) {
   result_topxi$nevi <- f.results@txpScores
   current_nevi <- f.results@txpScores
                                 
-  correlation <- cor(current_nevi, asthma_corr)
+  correlation <- cor(current_nevi, asthma_corr,method='spearman')
   
   # Return the negative correlation to maximize it
   return(correlation)
@@ -204,7 +204,7 @@ final.results <- txpCalculateScores(model = final.model,
 result_topxi<-data.frame(final.results@txpIDs)
 result_topxi$nevi<-final.results@txpScores
 current_nevi<-final.results@txpScores
-cor(current_nevi,asthma_corr)
+cor(current_nevi,asthma_corr,method='spearman')
 ```
 
 

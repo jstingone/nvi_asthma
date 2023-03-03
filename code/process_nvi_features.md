@@ -298,7 +298,7 @@ NY_Block_Population<-NY_Block_Population%>%
   dplyr::mutate(bgrp_tract=substr(bgrp,1,11))
 NY_tract_population<- NY_Block_Population %>% 
   group_by(bgrp_tract) %>% 
-  summarise(population = sum(population))%>%
+  summarise(population = sum(population))%>%     #We have data in census block level and now we convert them to census tract level
   rename(tract='bgrp_tract')
 ```
 
@@ -473,6 +473,12 @@ NY_green_space<-NY_green_space%>%
   mutate(GAHSQM=GAHSQM/LNDSQM)
 ```
 
+``` r
+#Saving a copy of the NY_green_space data for visualization before applying any transformation
+
+export(NY_green_space, "/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/preprocessing/greenspace_data_for_plot.csv")
+```
+
 Now we clean the greenspace data, transforming variables so that larger,
 more positive values of features would correspond to greater
 vulnerability.
@@ -568,7 +574,8 @@ tract_exclusions_list_id<-tract_exclusions_list_id%>%
 nevi_preprocessed<-nevi_preprocessed%>%
   left_join(NY_green_space,by='tract')
   
-#Remove the census tract that belong to the exclusion list
+#Remove the census tract that belong to the exclusion list 
+#(1.  A population of less than 20 or  At least 1 missing feature used in the NEVI or Neighborhood Deprivation Index (NDI), one of the indices to which the NEVI was compared)
 nevi_preprocessed<-nevi_preprocessed%>%
   anti_join(tract_exclusions_list_id,by='tract')
 ```

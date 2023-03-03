@@ -43,13 +43,13 @@ asthma_hospitalization<-asthma_hospitalization%>%
 
 In the asthma hospitalization data, there are ’\*’ that represent that
 there the count is less than 10 but greater than 0. So, to fill in those
-values we replace them with an integer between 1 to 5 generate randomly.
+values we replace them with an integer between 1 to 9 generate randomly.
 We set a seed for reproducibility.
 
 ``` r
 set.seed(42)
 asthma_hospitalization$Total<-asthma_hospitalization$Total%>%
-  map(function(x) gsub("[*]",floor(runif(1, min=1, max=6)),x))
+  map(function(x) gsub("[*]",floor(runif(1, min=1, max=9)),x))
 colnames(asthma_hospitalization)<-c('tract','cases')
 ```
 
@@ -95,7 +95,7 @@ asthma_hospitalization<-asthma_hospitalization%>%
   left_join(population_under18,by='tract')  #Attach the asthma hospitalization cases count with the population count.
 asthma_hospitalization$cases<-as.integer(asthma_hospitalization$cases)
 asthma_hospitalization<-asthma_hospitalization%>%
-  filter(tract %in% nevi_preprocessed$tract)  #Remove census tract that does not exist in the preprocessed_nevi.
+  filter(tract %in% nevi_preprocessed$tract)  #Remove census tract that does not exist in the pre-processed_nevi.
 asthma_hospitalization<-asthma_hospitalization%>%
   mutate(asthma_ratio=cases/total_u18)        #Calculate asthma hospitalization ratio
 asthma_hospitalization<-na.omit(asthma_hospitalization)     #Ignore all the data that contains missing values.
@@ -107,10 +107,35 @@ asthma_hospitalization<-asthma_hospitalization%>%
 ```
 
 ``` r
-m=hash() #Hash map that keeps tract of all the nevi_scores and all the sub-domain scores.
-best_corr=0 #Variable to keep tract of the maximum correlation achieved.
 best_weights=temp_model[["model"]]@txpWeights     #Copying the initial weights as the best weights. Will be replaced if a better correlation is obtained between the nevi and the asthma hospitalization count.
 
+f.model <- TxpModel(txpSlices = temp_model[["model"]]@txpSlices, 
+                    txpWeights = best_weights,
+                    txpTransFuncs = temp_model[["model"]]@txpTransFuncs)
+
+f.results <- txpCalculateScores(model = f.model, 
+                                input = nevi_preprocessed,
+                                id.var = 'tract' )
+result_topxi<-data.frame(f.results@txpIDs)
+result_topxi$nevi<-f.results@txpScores
+result_topxi<-cbind(result_topxi,f.results@txpSliceScores)
+asthma_data<-asthma_hospitalization%>%
+  select(tract,asthma_ratio)
+names(result_topxi)[names(result_topxi) == 'f.results.txpIDs']<-'tract'
+
+result_topxi_analyse<-result_topxi%>%
+  left_join(asthma_data,by='tract')%>%
+  relocate(asthma_ratio, .after = nevi)
+best_corr=cor(result_topxi_analyse$nevi,result_topxi_analyse$asthma_ratio,method='spearman') #Variable to keep tract of the maximum correlation achieved.
+
+print(paste0("Baseline Correlation Achieved with equal weights: ",best_corr))
+```
+
+    ## [1] "Baseline Correlation Achieved with equal weights: 0.292472721275403"
+
+``` r
+sub_domain_name=names(result_topxi)
+results_df <- data.frame(Result = numeric(0), setNames(replicate(31, numeric(0), simplify = FALSE), (sub_domain_name[3:33])))
 
 set.seed(42)
 temp_weights<-rdirichlet(10000, rep(1,31))     
@@ -147,46 +172,61 @@ best_corr=current_cor
 best_weights=temp_weights[i,]
 }
 corr_weights=temp_weights[i,]
-m[current_cor]=corr_weights
+#m[current_cor]=corr_weights
+row_to_add <- c(current_cor, corr_weights)  # Combine the result and numbers into a row
+results_df <- rbind(results_df, row_to_add)  # Add the row to the data frame
 }
+results_df<- setNames(results_df, c('result',sub_domain_name[3:33]))
 ```
 
 ``` r
 print(paste("Best Correlation Acheived : ", best_corr)) 
 ```
 
-    ## [1] "Best Correlation Acheived :  0.412951855075034"
+    ## [1] "Best Correlation Acheived :  0.384630790591374"
 
 ``` r
-print(paste("Best Weights : ",best_weights))
+for (i in (1:31))
+{
+  print(paste(sub_domain_name[2+i],best_weights[i]))
+}
 ```
 
-    ##  [1] "Best Weights :  0.00716338056403733" "Best Weights :  0.152510415136039"  
-    ##  [3] "Best Weights :  0.00628543784414089" "Best Weights :  0.113482564490509"  
-    ##  [5] "Best Weights :  0.206459901164178"   "Best Weights :  0.0317364011265323" 
-    ##  [7] "Best Weights :  0.0216979441602828"  "Best Weights :  0.0244944972790974" 
-    ##  [9] "Best Weights :  0.00864661274422889" "Best Weights :  0.0102494567699419" 
-    ## [11] "Best Weights :  0.00955932927811642" "Best Weights :  0.00071191939530869"
-    ## [13] "Best Weights :  0.00683714651981421" "Best Weights :  0.0158627393541753" 
-    ## [15] "Best Weights :  0.0662940475084317"  "Best Weights :  0.0051662759274862" 
-    ## [17] "Best Weights :  0.0168982745821563"  "Best Weights :  0.0115641797050761" 
-    ## [19] "Best Weights :  0.00692230822581533" "Best Weights :  0.0186377024918558" 
-    ## [21] "Best Weights :  0.0253533127786748"  "Best Weights :  0.05026318290072"   
-    ## [23] "Best Weights :  0.0133400580535002"  "Best Weights :  0.00539234387913106"
-    ## [25] "Best Weights :  0.0570378770014025"  "Best Weights :  0.0132981080680801" 
-    ## [27] "Best Weights :  0.013058617591261"   "Best Weights :  0.00620079644955602"
-    ## [29] "Best Weights :  0.0292325391611421"  "Best Weights :  0.00438094159348355"
-    ## [31] "Best Weights :  0.0412616882558251"
+    ## [1] "DemographicsAge 0.00716338056403733"
+    ## [1] "DemographicsFemaleLed 0.152510415136039"
+    ## [1] "DemographicsImmigration 0.00628543784414089"
+    ## [1] "DemographicsDisability 0.113482564490509"
+    ## [1] "DemographicsSingleParent 0.206459901164178"
+    ## [1] "DemographicsMobility 0.0317364011265323"
+    ## [1] "DemographicsLiveAlone 0.0216979441602828"
+    ## [1] "Economic IndicatorsIncomePoverty 0.0244944972790974"
+    ## [1] "Economic IndicatorsServiceManualJobs 0.00864661274422889"
+    ## [1] "Economic IndicatorsGini 0.0102494567699419"
+    ## [1] "Economic IndicatorsEmployment 0.00955932927811642"
+    ## [1] "Economic IndicatorsEducation 0.00071191939530869"
+    ## [1] "Economic IndicatorsVehicleAvail 0.00683714651981421"
+    ## [1] "Residential DensityPopDensity 0.0158627393541753"
+    ## [1] "Residential DensityGroupQuarters 0.0662940475084317"
+    ## [1] "Residential DensityOccPerRoom 0.0051662759274862"
+    ## [1] "Residential DensityStrAge 0.0168982745821563"
+    ## [1] "Residential DensityStrAttached 0.0115641797050761"
+    ## [1] "Residential DensityMove1Yr 0.00692230822581533"
+    ## [1] "Residential DensityVacancy 0.0186377024918558"
+    ## [1] "Health StatusLifestyle 0.0253533127786748"
+    ## [1] "Health StatusCondition 0.05026318290072"
+    ## [1] "Health StatusPreventive 0.0133400580535002"
+    ## [1] "Health StatusLackInsurance 0.00539234387913106"
+    ## [1] "Physical EnvironmentLandinlessfloodregion 0.0570378770014025"
+    ## [1] "Physical EnvironmentTreeForestGrassArea  0.0132981080680801"
+    ## [1] "Physical EnvironmentProximityToRoad 0.013058617591261"
+    ## [1] "Physical EnvironmentProximityToPark 0.00620079644955602"
+    ## [1] "Physical EnvironmentViewofWater 0.0292325391611421"
+    ## [1] "Physical EnvironmentToxicMaterials 0.00438094159348355"
+    ## [1] "Physical EnvironmentAirPollution 0.0412616882558251"
 
 ``` r
-#Store the sub-domain weights of the best 10 correlation results produced between nevi and asthma ratio
-top_10_keys=sort(keys(m),decreasing = TRUE)
-top_10_keys=top_10_keys[c(1:10)]
-top_10_key_value_pairs=m[top_10_keys]
+result_df_sorted <- arrange(results_df, desc(result))
 
-corr_data=data.frame("col_name"=names(result_topxi)[3:length(result_topxi)])
-corr_data['Best Value']=values(top_10_key_value_pairs[max(keys(top_10_key_value_pairs))])
-for(i in keys(top_10_key_value_pairs)){
-  corr_data[paste('Corr_Val',i)]=values(top_10_key_value_pairs[i])
-}
+# Select the top 10 rows
+top_10_result <- slice(result_df_sorted, 1:10)
 ```

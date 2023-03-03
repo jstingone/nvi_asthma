@@ -135,10 +135,10 @@ sub_domain_name=names(result_topxi)
 results_df <- data.frame(Result = numeric(0), setNames(replicate(31, numeric(0), simplify = FALSE), (sub_domain_name[3:33])))
 
 set.seed(42)
-temp_weights<-rdirichlet(30, rep(1,31))     
+temp_weights<-rdirichlet(10000, rep(1,31))     
 #10000 possible weights: Generate 10000 combination of 31 numbers that sum to 1. These would form the weights of the sub-domain. We further explore which of these 10000 weights produce the best correlation between the asthma hospitalization and the nevi formed.
 
-for (i in (1:30)){
+for (i in (1:10000)){
   
 f.model <- TxpModel(txpSlices = temp_model[["model"]]@txpSlices, 
                     txpWeights = temp_weights[i,],
