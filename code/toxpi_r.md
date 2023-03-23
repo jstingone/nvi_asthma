@@ -1,0 +1,232 @@
+toxpi\_r
+================
+Karveandhan
+11/7/2022
+
+### 1. Load Required Libraries
+
+Load the following required libraries.
+
+### 2. Create a ToxPi model using the designed toxpiheader from the process\_nvi\_features notebook
+
+The topxi model can be created directly as the csv is in the format of
+toxpiheader. It automatically creates slices and weights for each slices
+as mentioned in the csv file.
+
+``` r
+temp_model<-txpImportGui("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/preprocessing/nevi_tract_features_toxpiheader.csv")
+temp_model[["model"]]
+```
+
+    ## TxpModel with 31 slices.
+    ##   txpSlices(31): DemographicsAge DemographicsFemaleLed ... Physical
+    ##   EnvironmentToxicMaterials Physical EnvironmentAirPollution
+    ##   txpWeights(31): 0.0285714285714286 0.0285714285714286 ...
+    ##   0.0285714285714286 0.0285714285714286
+    ##   txpTransFuncs(31): NULL NULL ... NULL NULL
+
+### 3. Import the Asthma Hospitalization Data (Available in/as data/raw/AsthmaHosp\_2016\_lt17age.xlsx)
+
+``` r
+asthma_hospitalization<-read_excel("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/raw/AsthmaHosp_2016_lt17age.xlsx")
+asthma_hospitalization<-asthma_hospitalization[0:2266,]
+
+#Preprocess the data and transform the Census Tract to the format of interest.
+asthma_hospitalization$`Census Tract`<-asthma_hospitalization$`Census Tract`%>%
+   map(function(x) gsub("[.]","",x))
+asthma_hospitalization$`Census Tract`<-paste0("36",asthma_hospitalization$`Census Tract`)
+asthma_hospitalization<-asthma_hospitalization%>%
+  select(c('Census Tract','Total'))
+```
+
+### 4. Replace Missing Values
+
+In the asthma hospitalization data, there are ’\*’ that represent that
+there the count is less than 10 but greater than 0. So, to fill in those
+values we replace them with an integer between 1 to 9 generate randomly.
+We set a seed for reproducibility.
+
+``` r
+set.seed(42)
+asthma_hospitalization$Total<-asthma_hospitalization$Total%>%
+  map(function(x) gsub("[*]",floor(runif(1, min=1, max=9)),x))
+colnames(asthma_hospitalization)<-c('tract','cases')
+```
+
+### 5. Import population of under 18 for each cencus tract in New York City.
+
+As we have the number of asthma hospitalization cases for each census
+tract, we now need to normalize it for each census tract based on the
+population in that census tract. So, we first find the population of all
+under18 male and female. Further, we sum both to know the population in
+the census tract.
+
+``` r
+#Using the census_api_key to access the data
+
+census_api_key('23381961ae708c9374e30013b8f40b3485999b21') 
+```
+
+    ## To install your API key for use in future sessions, run this function with `install = TRUE`.
+
+``` r
+options(tigris_use_cache = TRUE)
+##### Specify county names for Census data download
+county_names <- c('New York County', 'Kings County', 'Bronx County', 'Richmond County', 'Queens County')
+vars <- c('B01001_027E','B01001_028E','B01001_029E','B01001_030E','B01001_003E','B01001_004E','B01001_005E','B01001_006E')
+population_under18 <- get_acs(geography = "tract", state = "NY", county = county_names, variables = vars, year = 2015, survey = "acs5", output = "wide", geometry = TRUE, keep_geo_vars = TRUE) %>% 
+  dplyr::as_tibble() %>% 
+  dplyr::select(-geometry)
+```
+
+    ## Getting data from the 2011-2015 5-year ACS
+
+``` r
+population_under18<-population_under18%>%
+  transmute(tract=GEOID,female_u18=B01001_027E+B01001_028E+B01001_029E+B01001_030E,  
+            #Sum of population of all age groups less than 18 (Female)
+            male_u18=B01001_003E+B01001_004E+B01001_005E+B01001_006E,   #Sum of population of all age groups less than 18 (Male)
+            total_u18=female_u18+male_u18)    #Sum of population of all age group less than 18 (Male+Female)
+```
+
+``` r
+nevi_preprocessed<-read_rds("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/preprocessing/nevi_tract_features.rds")
+asthma_hospitalization<-asthma_hospitalization%>%
+  left_join(population_under18,by='tract')  #Attach the asthma hospitalization cases count with the population count.
+asthma_hospitalization$cases<-as.integer(asthma_hospitalization$cases)
+asthma_hospitalization<-asthma_hospitalization%>%
+  filter(tract %in% nevi_preprocessed$tract)  #Remove census tract that does not exist in the pre-processed_nevi.
+asthma_hospitalization<-asthma_hospitalization%>%
+  mutate(asthma_ratio=cases/total_u18)        #Calculate asthma hospitalization ratio
+asthma_hospitalization<-na.omit(asthma_hospitalization)     #Ignore all the data that contains missing values.
+nevi_preprocessed<-nevi_preprocessed%>%
+  filter(tract %in% asthma_hospitalization$tract) 
+#Retain only the census tract data that does not contain any missing values of asthma hospitalization.
+asthma_hospitalization<-asthma_hospitalization%>%
+  mutate(asthma_ratio=asthma_ratio*1000)     #Multiply the asthma ratio by 1000 (Asthma Hospitalization per 1000 people)
+```
+
+``` r
+best_weights=temp_model[["model"]]@txpWeights     #Copying the initial weights as the best weights. Will be replaced if a better correlation is obtained between the nevi and the asthma hospitalization count.
+
+f.model <- TxpModel(txpSlices = temp_model[["model"]]@txpSlices, 
+                    txpWeights = best_weights,
+                    txpTransFuncs = temp_model[["model"]]@txpTransFuncs)
+
+f.results <- txpCalculateScores(model = f.model, 
+                                input = nevi_preprocessed,
+                                id.var = 'tract' )
+result_topxi<-data.frame(f.results@txpIDs)
+result_topxi$nevi<-f.results@txpScores
+result_topxi<-cbind(result_topxi,f.results@txpSliceScores)
+asthma_data<-asthma_hospitalization%>%
+  select(tract,asthma_ratio)
+names(result_topxi)[names(result_topxi) == 'f.results.txpIDs']<-'tract'
+
+result_topxi_analyse<-result_topxi%>%
+  left_join(asthma_data,by='tract')%>%
+  relocate(asthma_ratio, .after = nevi)
+best_corr=cor(result_topxi_analyse$nevi,result_topxi_analyse$asthma_ratio,method='spearman') #Variable to keep tract of the maximum correlation achieved.
+
+print(paste0("Baseline Correlation Achieved with equal weights: ",best_corr))
+```
+
+    ## [1] "Baseline Correlation Achieved with equal weights: 0.292472721275403"
+
+``` r
+sub_domain_name=names(result_topxi)
+results_df <- data.frame(Result = numeric(0), setNames(replicate(31, numeric(0), simplify = FALSE), (sub_domain_name[3:33])))
+
+set.seed(42)
+temp_weights<-rdirichlet(10000, rep(1,31))     
+#10000 possible weights: Generate 10000 combination of 31 numbers that sum to 1. These would form the weights of the sub-domain. We further explore which of these 10000 weights produce the best correlation between the asthma hospitalization and the nevi formed.
+
+for (i in (1:10000)){
+  
+f.model <- TxpModel(txpSlices = temp_model[["model"]]@txpSlices, 
+                    txpWeights = temp_weights[i,],
+                    txpTransFuncs = temp_model[["model"]]@txpTransFuncs)
+#Develop a ToxPi model for each of the 10000 possible weight
+
+f.results <- txpCalculateScores(model = f.model, 
+                                input = nevi_preprocessed,
+                                id.var = 'tract' )
+# Calculate the nevi
+
+result_topxi<-data.frame(f.results@txpIDs)
+result_topxi$nevi<-f.results@txpScores
+result_topxi<-cbind(result_topxi,f.results@txpSliceScores)
+asthma_data<-asthma_hospitalization%>%
+  select(tract,asthma_ratio)
+names(result_topxi)[names(result_topxi) == 'f.results.txpIDs']<-'tract'
+
+result_topxi_analyse<-result_topxi%>%
+  left_join(asthma_data,by='tract')%>%
+  relocate(asthma_ratio, .after = nevi)
+current_cor=cor(result_topxi_analyse$nevi,result_topxi_analyse$asthma_ratio,method='spearman')    
+#Find the correlation between the nevi and the asthma ratio
+
+if(current_cor>best_corr) #If better result produced replace the best correlation obtained and the sub-domain weights.
+{
+best_corr=current_cor
+best_weights=temp_weights[i,]
+}
+corr_weights=temp_weights[i,]
+#m[current_cor]=corr_weights
+row_to_add <- c(current_cor, corr_weights)  # Combine the result and numbers into a row
+results_df <- rbind(results_df, row_to_add)  # Add the row to the data frame
+}
+results_df<- setNames(results_df, c('result',sub_domain_name[3:33]))
+```
+
+``` r
+print(paste("Best Correlation Acheived : ", best_corr)) 
+```
+
+    ## [1] "Best Correlation Acheived :  0.384630790591374"
+
+``` r
+for (i in (1:31))
+{
+  print(paste(sub_domain_name[2+i],best_weights[i]))
+}
+```
+
+    ## [1] "DemographicsAge 0.00716338056403733"
+    ## [1] "DemographicsFemaleLed 0.152510415136039"
+    ## [1] "DemographicsImmigration 0.00628543784414089"
+    ## [1] "DemographicsDisability 0.113482564490509"
+    ## [1] "DemographicsSingleParent 0.206459901164178"
+    ## [1] "DemographicsMobility 0.0317364011265323"
+    ## [1] "DemographicsLiveAlone 0.0216979441602828"
+    ## [1] "Economic IndicatorsIncomePoverty 0.0244944972790974"
+    ## [1] "Economic IndicatorsServiceManualJobs 0.00864661274422889"
+    ## [1] "Economic IndicatorsGini 0.0102494567699419"
+    ## [1] "Economic IndicatorsEmployment 0.00955932927811642"
+    ## [1] "Economic IndicatorsEducation 0.00071191939530869"
+    ## [1] "Economic IndicatorsVehicleAvail 0.00683714651981421"
+    ## [1] "Residential DensityPopDensity 0.0158627393541753"
+    ## [1] "Residential DensityGroupQuarters 0.0662940475084317"
+    ## [1] "Residential DensityOccPerRoom 0.0051662759274862"
+    ## [1] "Residential DensityStrAge 0.0168982745821563"
+    ## [1] "Residential DensityStrAttached 0.0115641797050761"
+    ## [1] "Residential DensityMove1Yr 0.00692230822581533"
+    ## [1] "Residential DensityVacancy 0.0186377024918558"
+    ## [1] "Health StatusLifestyle 0.0253533127786748"
+    ## [1] "Health StatusCondition 0.05026318290072"
+    ## [1] "Health StatusPreventive 0.0133400580535002"
+    ## [1] "Health StatusLackInsurance 0.00539234387913106"
+    ## [1] "Physical EnvironmentLandinlessfloodregion 0.0570378770014025"
+    ## [1] "Physical EnvironmentTreeForestGrassArea  0.0132981080680801"
+    ## [1] "Physical EnvironmentProximityToRoad 0.013058617591261"
+    ## [1] "Physical EnvironmentProximityToPark 0.00620079644955602"
+    ## [1] "Physical EnvironmentViewofWater 0.0292325391611421"
+    ## [1] "Physical EnvironmentToxicMaterials 0.00438094159348355"
+    ## [1] "Physical EnvironmentAirPollution 0.0412616882558251"
+
+``` r
+result_df_sorted <- arrange(results_df, desc(result))
+
+# Select the top 10 rows
+top_10_result <- slice(result_df_sorted, 1:10)
+```

@@ -1,0 +1,288 @@
+---
+title: "Visualization"
+author: "Karveandhan"
+date: "2/22/2023"
+output: html_document
+---
+
+
+### 1. Load Required Libraries
+
+Load the following required libraries.
+
+```{r, libraries}
+library(tidyverse)
+library(stringi)
+library(rio)
+library(factoextra)
+library(cluster)
+library(skimr)
+# Tables
+library(janitor)
+library(gtsummary)
+# Mapping
+library(sf)
+library(ggpubr)
+library(ggsn)
+library(ggspatial)
+library(nycgeo)
+library(tigris)
+library(ggsflabel) # Ref: https://yutannihilation.github.io/ggsflabel/index.html
+# Plots
+library(ggpubr)
+library(colorBlindness)
+library(ggpattern) # Ref: https://coolbutuseless.github.io/package/ggpattern/index.html
+library(gplots) # heat map
+```
+
+### 2. Import Greenspace and Air-pollution data
+
+```{r setup}
+green_space_plot=read.csv("/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/preprocessing/greenspace_data_for_plot.csv")
+```
+
+### 3. Create spatial objects
+
+```{r}
+### IMPORT: NYC specific Census tract/borough boundaries
+tract_nyc_spa1 <- nycgeo::nyc_boundaries(geography = "tract") %>% 
+  dplyr::transmute(Tract_FIPS = geoid) %>%
+  st_as_sf() %>%
+  st_set_crs(2263)
+borough_nyc_spa1 <- nycgeo::nyc_boundaries(geography = "borough") %>% 
+  dplyr::arrange(borough_name) %>%
+  st_as_sf() %>%
+  st_set_crs(2263)
+
+# Spatial: crs = "+init=epsg:2263"
+  # Included
+tract_gs_final_sp1<-tract_nyc_spa1%>%
+  dplyr::inner_join(green_space_plot %>% mutate(Tract_FIPS=as.character(tract)%>% trimws()),by ='Tract_FIPS') 
+
+tract_gs_exclude_sp1<-tract_nyc_spa1%>%
+  dplyr::anti_join(green_space_plot %>% mutate(Tract_FIPS=as.character(tract)%>% trimws()),by ='Tract_FIPS')  #Excluding the tract in the exclusion list
+```
+
+### 4. Figures for GreenSpace
+
+```{r}
+#### CREATE: Functions to create maps
+gen_fig_green_space<-function(dfin,dfexcl,dfborough,fill_var,fill_color,fill_label,lab_borough)
+{
+  plot_1<-ggplot()+     # tracts
+    geom_sf(data=dfin,aes(fill=!!sym(fill_var)),color=NA)+     # tracts, excluded
+    geom_sf(data=dfexcl,color="grey30",fill="grey30")+
+    geom_sf(data=dfborough,color='grey20',fill=NA,size=0.2)+
+    theme_minimal()+    # Alt: ggthemes::theme_map()
+    # boroughs
+    ggspatial::annotation_north_arrow(location = 'br', height = unit(1,'cm'), width = unit(1.1, 'cm'), pad_x = unit(1.5, "cm"), pad_y = unit(0.5, "cm"), style = north_arrow_orienteering(fill = c('black','black'), text_size = 11))+
+     ggsn::scalebar(data = dfborough, dist = 10, dist_unit = "mi", height = 0.01, st.size = 5, st.dist = 0.05, transform = FALSE, model = 'WGS84', location = "bottomright")+
+           # Alt: ggsn::north(data = dfborough, location = "topleft", symbol = 10, scale = 0.10) + # use the ggspatial package in order to export to .eps properly
+        # Alt: ggspatial::annotation_scale(plot_unit = "mi", location = 'br') + #bgcolor("lightcyan") + #snow2 #plot_unit = "mi", pad_x = unit(7.5, "cm"), pad_y = unit(-1, "cm")
+
+    labs(fill = fill_label)+
+    scale_fill_gradient(low = "whitesmoke", high = fill_color)+ # na.value = "gray30"
+    theme(legend.title = element_text(face = "bold", size = 15), # plot.title = element_text(hjust = 0.75, face = "bold", size = 15),
+          legend.text = element_text(size = 12),
+          legend.spacing.x = unit(0.5, 'cm'),
+          legend.position = "right",
+          axis.line = element_blank(),
+          axis.text = element_blank(),
+          axis.title = element_blank(),
+          panel.grid = element_blank())  # plot.caption = element_text(hjust = 0, size = 10, face = "italic"), legend.position = c(1,0.5), plot.background = element_rect(fill = "lightcyan")
+    
+  return(plot_1)
+    
+}
+
+```
+
+
+```{r}
+far_from_park_entrance_fig<-gen_fig_green_space(dfin = tract_gs_final_sp1,dfexcl = tract_gs_exclude_sp1,dfborough = borough_nyc_spa1,fill_var ='BWDP_Pop',fill_label ="Estimated residential population\n not within 500m \nof a park entrance ",lab_borough = 'borough_name', fill_color = '#6b3c03')
+block_population_fig<-gen_fig_green_space(dfin = tract_gs_final_sp1,dfexcl = tract_gs_exclude_sp1,dfborough = borough_nyc_spa1,fill_var ='population',fill_label = "Population",lab_borough = 'borough_name', fill_color = '#950f00')
+view_of_water_fig<-gen_fig_green_space(dfin = tract_gs_final_sp1,dfexcl = tract_gs_exclude_sp1,dfborough = borough_nyc_spa1,fill_var ='WVW_Pop',fill_label = "View\n of Water",lab_borough = 'borough_name', fill_color = '#006195')
+far_from_park_entrance_fig
+block_population_fig
+view_of_water_fig
+
+```
+
+### 5. Preprocessing the Air Pollution data
+
+
+```{r pressure, echo=FALSE}
+air_poll<-read_csv('/Users/karveandhan/Desktop/Columbia University/DASHI Project/nvi_asthma/data/processed/AirPoll_ct2010.csv')
+air_poll_inclu<-data.frame(tract_gs_final_sp1$Tract_FIPS)
+colnames(air_poll_inclu)<-c('Tract_FIPS')
+air_poll$ct2010<-as.character(air_poll$ct2010)
+air_poll$code<-stri_sub(air_poll$ct2010, 1, 1)
+ 
+air_poll$ct2010<-ifelse(air_poll$code=="1", sub('.', '36061', air_poll$ct2010), ifelse(air_poll$code=="2", sub('.', '36005', air_poll$ct2010), ifelse(air_poll$code=="3", sub('.', '36047', air_poll$ct2010), ifelse(air_poll$code=="4", sub('.', '36081', air_poll$ct2010), sub('.', '36085', air_poll$ct2010)))))
+air_poll<-air_poll%>%
+  rename(Tract_FIPS='ct2010')
+
+
+air_poll_inclu<- air_poll_inclu%>%
+  left_join(air_poll, by='Tract_FIPS')
+
+air_poll_inclu<-air_poll_inclu%>%
+  select(-c(...1))
+```
+
+### 6.Finding the mean of all 5 gas components over all years from 2009 to 2019 for visulization
+
+
+```{r}
+ temp_air_plot<-air_poll_inclu%>%
+  group_by(code)%>%
+   summarise(mean(PM.09),mean(PM.10),mean(PM.11),mean(PM.12),mean(PM.13),mean(PM.14),mean(PM.15),mean(PM.16),mean(PM.17),mean(PM.18),mean(PM.19))
+
+ 
+ colnames(temp_air_plot)<-c('group','PM.09','PM.10','PM.11','PM.12','PM.13','PM.14','PM.15','PM.16','PM.17','PM.18','PM.19')
+ny_data0<-data.frame(temp_air_plot)
+ny_data0<-as.data.frame(t(ny_data0))
+
+ny_data0 <- tibble::rownames_to_column(ny_data0, "PM2.5_Year")
+names(ny_data0)<-c("PM2.5_Year","Manhattan","Bronx","Brooklyn","Queens","Staten Island")
+col_na<-c("Manhattan","Bronx","Brooklyn","Queens","Staten Island")
+
+ny_data0[col_na] <- sapply(ny_data0[col_na],as.numeric)
+ny_data0<-as.data.frame(ny_data0[-c(1),])
+
+ny_data0<-ny_data0 %>%
+  pivot_longer(!PM2.5_Year, names_to = "County", values_to = "PM2.5")
+fig1<-ggplot(ny_data0, aes(x = PM2.5_Year, y = PM2.5, fill = County, color = County))+
+  geom_point()+
+  expand_limits( y = 0)+
+  labs(x = "2008 to 2019", 
+ y = "Level of PM2.5", title = "Mean Level of PM2.5 in 5 different counties in New York for different years")+
+  scale_y_continuous(breaks=seq(0,15,1))
+
+```
+
+
+```{r}
+ temp_air_plot<-air_poll_inclu%>%
+  group_by(code)%>%
+   summarise(mean(BC.09),mean(BC.10),mean(BC.11),mean(BC.12),mean(BC.13),mean(BC.14),mean(BC.15),mean(BC.16),mean(BC.17),mean(BC.18),mean(BC.19))
+
+ 
+ colnames(temp_air_plot)<-c('group','BC.09','BC.10','BC.11','BC.12','BC.13','BC.14','BC.15','BC.16','BC.17','BC.18','BC.19')
+ ny_data0<-data.frame(temp_air_plot)
+ny_data0<-as.data.frame(t(ny_data0))
+library(tibble)
+ny_data0 <- tibble::rownames_to_column(ny_data0, "BC_Year")
+names(ny_data0)<-c("BC_Year","Manhattan","Bronx","Brooklyn","Queens","Staten Island")
+col_na<-c("Manhattan","Bronx","Brooklyn","Queens","Staten Island")
+
+ny_data0[col_na] <- sapply(ny_data0[col_na],as.numeric)
+ny_data0<-as.data.frame(ny_data0[-c(1),])
+
+ny_data0<-ny_data0 %>%
+  pivot_longer(!BC_Year, names_to = "County", values_to = "BC")
+fig2<-ggplot(ny_data0, aes(x = BC_Year, y = BC, fill = County, color = County))+
+  geom_point()+
+  expand_limits( y = 0)+
+  labs(x = "2008 to 2019", 
+ y = "Level of Black Carbon", title = "Mean Level of Black Carbon in 5 different counties in New York for different years")+
+  scale_y_continuous(breaks=seq(0,2,0.2))
+
+```
+
+
+```{r}
+ temp_air_plot<-air_poll_inclu%>%
+  group_by(code)%>%
+   summarise(mean(NO2.09),mean(NO2.10),mean(NO2.11),mean(NO2.12),mean(NO2.13),mean(NO2.14),mean(NO2.15),mean(NO2.16),mean(NO2.17),mean(NO2.18),mean(NO2.19))
+
+ 
+ colnames(temp_air_plot)<-c('group','NO2.09','NO2.10','NO2.11','NO2.12','NO2.13','NO2.14','NO2.15','NO2.16','NO2.17','NO2.18','NO2.19')
+ ny_data0<-data.frame(temp_air_plot)
+ny_data0<-as.data.frame(t(ny_data0))
+library(tibble)
+ny_data0 <- tibble::rownames_to_column(ny_data0, "NO2_Year")
+names(ny_data0)<-c("NO2_Year","Manhattan","Bronx","Brooklyn","Queens","Staten Island")
+col_na<-c("Manhattan","Bronx","Brooklyn","Queens","Staten Island")
+
+ny_data0[col_na] <- sapply(ny_data0[col_na],as.numeric)
+ny_data0<-as.data.frame(ny_data0[-c(1),])
+
+ny_data0<-ny_data0 %>%
+  pivot_longer(!NO2_Year, names_to = "County", values_to = "NO2")
+fig3<-ggplot(ny_data0, aes(x = NO2_Year, y = NO2, fill = County, color = County))+
+  geom_point()+
+  expand_limits( y = 0)+
+  labs(x = "2008 to 2019", 
+ y = "Level of Nitrogen Dioxide", title = "Mean Level of Nitrogen Dioxide in 5 different counties in New York for different years")+
+  scale_y_continuous(breaks=seq(0,35,5))
+
+```
+
+
+```{r}
+ temp_air_plot<-air_poll_inclu%>%
+  group_by(code)%>%
+   summarise(mean(O3.09),mean(O3.10),mean(O3.11),mean(O3.12),mean(O3.13),mean(O3.14),mean(O3.15),mean(O3.16),mean(O3.17),mean(O3.18),mean(O3.19))
+
+ 
+ colnames(temp_air_plot)<-c('group','O3.09','O3.10','O3.11','O3.12','O3.13','O3.14','O3.15','O3.16','O3.17','O3.18','O3.19')
+ ny_data0<-data.frame(temp_air_plot)
+ny_data0<-as.data.frame(t(ny_data0))
+library(tibble)
+ny_data0 <- tibble::rownames_to_column(ny_data0, "O3_Year")
+names(ny_data0)<-c("O3_Year","Manhattan","Bronx","Brooklyn","Queens","Staten Island")
+col_na<-c("Manhattan","Bronx","Brooklyn","Queens","Staten Island")
+
+ny_data0[col_na] <- sapply(ny_data0[col_na],as.numeric)
+ny_data0<-as.data.frame(ny_data0[-c(1),])
+
+ny_data0<-ny_data0 %>%
+  pivot_longer(!O3_Year, names_to = "County", values_to = "O3")
+fig4<-ggplot(ny_data0, aes(x = O3_Year, y = O3, fill = County, color = County))+
+  geom_point()+
+  expand_limits( y = 0)+
+  labs(x = "2008 to 2019", 
+ y = "Level of Ozone", title = "Mean Level of Ozone in 5 different counties in New York for different years")+
+  scale_y_continuous(breaks=seq(0,40,10))
+
+
+```
+
+```{r}
+#SO2 data is only availble from 2009 to 2016
+temp_air_plot<-air_poll_inclu%>%
+  group_by(code)%>%
+   summarise(mean(SO2.09),mean(SO2.10),mean(SO2.11),mean(SO2.12),mean(SO2.13),mean(SO2.14),mean(SO2.15),mean(SO2.16))
+
+ 
+ colnames(temp_air_plot)<-c('group','SO2.09','SO2.10','SO2.11','SO2.12','SO2.13','SO2.14','SO2.15','SO2.16')
+ ny_data0<-data.frame(temp_air_plot)
+ny_data0<-as.data.frame(t(ny_data0))
+library(tibble)
+ny_data0 <- tibble::rownames_to_column(ny_data0, "SO2_Year")
+names(ny_data0)<-c("SO2_Year","Manhattan","Bronx","Brooklyn","Queens","Staten Island")
+col_na<-c("Manhattan","Bronx","Brooklyn","Queens","Staten Island")
+
+ny_data0[col_na] <- sapply(ny_data0[col_na],as.numeric)
+ny_data0<-as.data.frame(ny_data0[-c(1),])
+
+ny_data0<-ny_data0 %>%
+  pivot_longer(!SO2_Year, names_to = "County", values_to = "SO2")
+fig5<-ggplot(ny_data0, aes(x = SO2_Year, y = SO2, fill = County, color = County))+
+  geom_point()+
+  expand_limits( y = 0)+
+  labs(x = "2008 to 2019", 
+ y = "Level of Sulphur Dioxide", title = "Mean Level of Sulphur Dioxide in 5 different counties in New York for different years")+
+  scale_y_continuous(breaks=seq(0,10,1))
+
+```
+
+```{r}
+fig1
+fig2
+fig3
+fig4
+fig5
+
+```

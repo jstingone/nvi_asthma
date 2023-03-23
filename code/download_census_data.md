@@ -1,14 +1,18 @@
----
-title: "Neighborhood Environmental Vulnerability Index, 2015: Downloading U.S. Census Data"
-output: rmarkdown::github_document
----
+Neighborhood Environmental Vulnerability Index, 2015: Downloading U.S.
+Census Data
+================
 
-Below are steps to download data from the [U.S. Census 2015 5-year estimates](https://www.census.gov/data/developers/data-sets/acs-5year.2015.html). We have already included the downloaded file in our repository: `data/raw/US Census/us_census_acs_2015.rds`.
+Below are steps to download data from the [U.S. Census 2015 5-year
+estimates](https://www.census.gov/data/developers/data-sets/acs-5year.2015.html).
+We have already included the downloaded file in our repository:
+`data/raw/US Census/us_census_acs_2015.rds`.
 
 ### 1. Set Working Directory
-Set the working directory to one folder up from the RMarkdown file for later data export.
 
-```{r, setup}
+Set the working directory to one folder up from the RMarkdown file for
+later data export.
+
+``` r
 knitr::opts_knit$set(root.dir = "~/Desktop/Columbia University/DASHI Project/nvi_asthma") 
 #setwd("~/Desktop/Columbia University/DASHI Project/nvi_asthma")
 ```
@@ -17,26 +21,65 @@ knitr::opts_knit$set(root.dir = "~/Desktop/Columbia University/DASHI Project/nvi
 
 Load the following required libraries.
 
-```{r,libraries}
+``` r
 library(tidyverse)
+```
+
+    ## Warning: package 'tidyverse' was built under R version 4.1.2
+
+    ## ── Attaching packages ─────────────────────────────────────── tidyverse 1.3.2 ──
+    ## ✔ ggplot2 3.3.6      ✔ purrr   0.3.4 
+    ## ✔ tibble  3.1.8      ✔ dplyr   1.0.10
+    ## ✔ tidyr   1.2.1      ✔ stringr 1.4.1 
+    ## ✔ readr   2.1.2      ✔ forcats 0.5.2
+
+    ## Warning: package 'ggplot2' was built under R version 4.1.2
+
+    ## Warning: package 'tibble' was built under R version 4.1.2
+
+    ## Warning: package 'tidyr' was built under R version 4.1.2
+
+    ## Warning: package 'readr' was built under R version 4.1.2
+
+    ## Warning: package 'dplyr' was built under R version 4.1.2
+
+    ## Warning: package 'stringr' was built under R version 4.1.2
+
+    ## Warning: package 'forcats' was built under R version 4.1.2
+
+    ## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+    ## ✖ dplyr::filter() masks stats::filter()
+    ## ✖ dplyr::lag()    masks stats::lag()
+
+``` r
 library(tidycensus)
 ```
 
+    ## Warning: package 'tidycensus' was built under R version 4.1.2
+
 ### 3. Download U.S. Census Data
 
-The following code uses the R `tidycensus` package to download the U.S. Census data using their API.
+The following code uses the R `tidycensus` package to download the U.S.
+Census data using their API.
 
--   You will need to [request a U.S. Census API key](https://api.census.gov/data/key_signup.html)
+-   You will need to [request a U.S. Census API
+    key](https://api.census.gov/data/key_signup.html)
 
 -   For your own version of the index, you may consider changing the:
 
     -   County names (`county_names`)
 
-    -   U.S. Census variables to include in the index (`vars`, `vars_subject`)
+    -   U.S. Census variables to include in the index (`vars`,
+        `vars_subject`)
 
-```{r,download_census}
+``` r
 ##### Update this with your own U.S. Census API key. 
 census_api_key('23381961ae708c9374e30013b8f40b3485999b21') 
+```
+
+    ## To install your API key for use in future sessions, run this function with `install = TRUE`.
+
+``` r
 options(tigris_use_cache = TRUE)
 ##### Specify county names for Census data download
 county_names <- c('New York County', 'Kings County', 'Bronx County', 'Richmond County', 'Queens County')
@@ -97,23 +140,32 @@ vars_subject <- c(
 census_orig <- get_acs(geography = "tract", state = "NY", county = county_names, variables = vars, year = 2015, survey = "acs5", output = "wide", geometry = TRUE, keep_geo_vars = TRUE) %>% 
   dplyr::as_tibble() %>% 
   dplyr::select(-geometry)
+```
 
+    ## Getting data from the 2011-2015 5-year ACS
+
+``` r
   # Download data from the Census subject tables 
 census_orig_subject_table <- get_acs(geography = "tract", state = "NY", county = county_names, variables = vars_subject, year = 2015, survey = "acs5", output = "wide") %>% 
   dplyr::select(-NAME)
+```
 
+    ## Getting data from the 2011-2015 5-year ACS
+
+    ## Using the ACS Subject Tables
+
+``` r
 ## Merge all Census data together by FIPS code 
 census_orig <- census_orig %>% 
   left_join(census_orig_subject_table, by = "GEOID")
-
 ```
 
 ### 4. Export Census Data
 
-Save the Census data that you have just downloaded locally for later use.
+Save the Census data that you have just downloaded locally for later
+use.
 
-```{r,export_census}
+``` r
 #Saving the data 2011 - 2015 ACS
 saveRDS(census_orig, file = "data/raw/US Census/us_census_acs_2015.rds")
-
 ```
