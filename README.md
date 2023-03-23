@@ -97,3 +97,14 @@ To calculate the NEVI, you will need to follow the instructions in these documen
 - [`process_nvi_features`](https://github.com/jstingone/nvi_asthma/blob/main/code/process_nvi_features.md): Prepare features to input into ToxPi.
 - [`toxpi_r`](https://github.com/jstingone/nvi_asthma/blob/main/code/toxpi_r.md): Calculate the NEVI and subdomain scores using Toxpi.
 
+
+## 6. Cloning this Repository with RStudio
+Below are steps to clone this repository to your local device with RStudio. Please refer to this [link](https://resources.github.com/github-and-rstudio/) for more information about using git in RStudio.
+
+1. On top this page, click on `Code` and copy the link to this git repository (starts with https://github.com/...).
+2. Open RStudio.
+3. In RStudio, click on `File` &rarr; `New Project...` &rarr; `Version Control` &rarr; `Git`.
+4. Under "Repository URL", paste the link of the git repository.
+5. Under "Project directory name", name your project directory.
+6. Under "Create project as subdirectory of:", select the folder in which you would like your project directory to be located.
+7. Click on `Create Project` when you are done to clone your repository! This should take a minute or two to complete.
